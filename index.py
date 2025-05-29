@@ -4,60 +4,69 @@ from config import database  # Import database connection
 
 app = FastAPI()
 
-# ✅ User Model (Request Body)
-class User(BaseModel):
-    username: str
+# ✅ client Model (Request Body)
+class client(BaseModel):
+    clientname: str
+    phonenumber: str
+    dateofbirth: str
+    gender: str
+    bloodgroup: str
+    address: str
+    notes: str
     email: str
-    password: str
+    height: float
+    weight: float
 
-# ✅ Create User
-@app.post("/users/")
-def create_user(user: User):
+
+
+# ✅ Create client (add page)
+@app.post("/clients/")
+def create_client(client: client):
     try:
         database.cur.execute(
-            "INSERT INTO users (username, email, password) VALUES (%s, %s, %s) RETURNING id",
-            (user.username, user.email, user.password),
+            "INSERT INTO clients (clientname,phonenumber,dateofbirth,gender,bloodgroup,address,notes,email,height,weight) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (client.clientname, client.phonenumber, client.dateofbirth, client.gender, client.bloodgroup, client.address, client.notes, client.email, client.height, client.weight),
         )
         database.conn.commit()
-        user_id = database.cur.fetchone()[0]
-        return {"id": user_id, "message": "User created successfully"}
+        client_id = database.cur.fetchone()[0]
+        return {"id": client_id, "message": "client created successfully"}
     except Exception as e:
         database.conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-# ✅ Read All Users
-@app.get("/users/")
-def get_users():
-    database.cur.execute("SELECT id, username, email FROM users")
-    users = database.cur.fetchall()
-    return {"users": users}
+# ✅ Read All clients(total members)
+@app.get("/clients/")
+def get_clients():
+    database.cur.execute("SELECT id,clientname,phonenumber,dateofbirth,gender,bloodgroup,address,notes,email,height,weight FROM clients")
+    clients = database.cur.fetchall()
+    return {"clients": clients}
 
-# ✅ Read Single User
-@app.get("/users/{user_id}")
-def get_user(user_id: int):
-    database.cur.execute("SELECT id, username, email FROM users WHERE id = %s", (user_id,))
-    user = database.cur.fetchone()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"id": user[0], "username": user[1], "email": user[2]}
+# ✅ Read Single client(use it as search function)
+@app.get("/clients/{client_id}")
+def get_client(client_id: int):
+    database.cur.execute("SELECT id,clientname,phonenumber,dateofbirth,gender,bloodgroup,address,notes,email,height,weight FROM clients WHERE id = %s", (client_id,))
+    client = database.cur.fetchone()
+    if not client:
+        raise HTTPException(status_code=404, detail="client not found")
+    return {"specific client detail":client}  
 
-# ✅ Update User
-@app.put("/users/{user_id}")
-def update_user(user_id: int, user: User):
+# ✅ Update client(updating create page details we can add it in edit option)
+@app.put("/clients/{client_id}")
+def update_client(client_id: int, client: client):
     database.cur.execute(
-        "UPDATE users SET username = %s, email = %s, password = %s WHERE id = %s RETURNING id",
-        (user.username, user.email, user.password, user_id),
+        "UPDATE clients SET clientname = %s,phonenumber = %s,dateofbirth = %s,gender = %s,bloodgroup = %s,address = %s,notes = %s,email = %s,height = %s,weight = %s WHERE id = %s RETURNING id",
+        (client.clientname, client.phonenumber, client.dateofbirth, client.gender, client.bloodgroup, client.address, client.notes, client.email, client.height, client.weight,client_id),
     )
     database.conn.commit()
     if database.cur.rowcount == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"message": "User updated successfully"}
+        raise HTTPException(status_code=404, detail="client not found")
+    return {"message": "client updated successfully"}
 
-# ✅ Delete User
-@app.delete("/users/{user_id}")
-def delete_user(user_id: int):
-    database.cur.execute("DELETE FROM users WHERE id = %s RETURNING id", (user_id,))
+# ✅ Delete client(deleting client we can add it in delete option)
+@app.delete("/clients/{client_id}")
+def delete_client(client_id: int):
+    database.cur.execute("DELETE FROM clients WHERE id = %s RETURNING id", (client_id,))
     database.conn.commit()
     if database.cur.rowcount == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"message": "User deleted successfully"}
+        raise HTTPException(status_code=404, detail="client not found")
+    return {"message": "client deleted successfully"}
