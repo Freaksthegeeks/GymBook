@@ -1,4 +1,6 @@
 import psycopg2
+import psycopg2.extras
+
 
 # Database connection
 conn = psycopg2.connect(
@@ -8,7 +10,7 @@ conn = psycopg2.connect(
     host="localhost",
     port="5432"
 )
-cur = conn.cursor()
+cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 # Ensure the table exists
 cur.execute("""
@@ -26,6 +28,12 @@ cur.execute("""
         weight Float NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         
-    )
+    );
+            CREATE TABLE IF NOT EXISTS plans (
+        id SERIAL PRIMARY KEY,
+        planname VARCHAR(50) UNIQUE NOT NULL,
+        days text NOT NULL,
+        amount NUMERIC(10,2)       
+    );           
 """)
 conn.commit()

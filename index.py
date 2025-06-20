@@ -17,9 +17,9 @@ class client(BaseModel):
     height: float
     weight: float
 
+#CLIENTS
 
-
-# ✅ Create client (add page)
+# ✅ Create client (add client page)
 @app.post("/clients/")
 def create_client(client: client):
     try:
@@ -70,3 +70,58 @@ def delete_client(client_id: int):
     if database.cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="client not found")
     return {"message": "client deleted successfully"}
+
+
+#PLANS
+
+class plan(BaseModel):
+    planname: str
+    days: int
+    amount: float
+    
+
+# ✅ Create plan (add plan page)
+@app.post("/plans/")
+def create_plan(plan: plan):
+    try:
+        database.cur.execute(
+            "INSERT INTO plans (planname,days,amount) VALUES (%s,%s,%s) RETURNING id",
+            (plan.planname, plan.days, plan.amount),
+        )
+        database.conn.commit()
+        plan_id = database.cur.fetchone()[0]
+        return {"id": plan_id, "message": "plan created successfully"}
+    except Exception as e:
+        database.conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ✅ Read All plans(total plans)
+@app.get("/plans/")
+def get_plans():
+    database.cur.execute("SELECT id,planname,days,amount FROM plans")
+    plans = database.cur.fetchall()
+    return {"plans": plans}
+
+# ✅ Update plans(updating create plan details we can add it in edit option)
+@app.put("/plans/{plan_id}")
+def update_plan(plan_id: int, plan: plan):
+    database.cur.execute(
+        "UPDATE plans SET planname = %s, days = %s, amount = %s WHERE id = %s RETURNING id",
+        (plan.planname, plan.days, plan.amount, plan_id),
+    )
+    database.conn.commit()
+    if database.cur.rowcount == 0:
+        raise HTTPException(status_code=404, detail="plan not found")
+    return {"message": "plan updated successfully"}
+
+# ✅ Delete plans(deleting plan we can add it in delete option)
+@app.delete("/plans/{plan_id}")
+def delete_plan(plan_id: int):
+    database.cur.execute("DELETE FROM plans WHERE id = %s RETURNING id", (plan_id,))
+    database.conn.commit()
+    if database.cur.rowcount == 0:
+        raise HTTPException(status_code=404, detail="plan not found")
+    return {"message": "plan deleted successfully"}
+
+#STAFF
+
