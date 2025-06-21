@@ -32,7 +32,7 @@ cur.execute("""
             CREATE TABLE IF NOT EXISTS plans (
         id SERIAL PRIMARY KEY,
         planname VARCHAR(50) UNIQUE NOT NULL,
-        days text NOT NULL,
+        days int NOT NULL,
         amount NUMERIC(10,2)       
     );           
 """)
