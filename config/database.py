@@ -34,6 +34,14 @@ cur.execute("""
         planname VARCHAR(50) UNIQUE NOT NULL,
         days int NOT NULL,
         amount NUMERIC(10,2)       
-    );           
+    );  
+            CREATE TABLE IF NOT EXISTS staffs (
+        id SERIAL PRIMARY KEY,
+        staffname VARCHAR(50) UNIQUE NOT NULL,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        phonenumber BIGINT NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP       
+    );         
 """)
 conn.commit()
