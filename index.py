@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from config import database  # Import database connection
-
+from datetime import date,timedelta
+from fastapi import Query
+from typing import Optional
 app = FastAPI()
 
 # ✅ client Model (Request Body)
@@ -12,10 +14,12 @@ class client(BaseModel):
     gender: str
     bloodgroup: str
     address: str
-    notes: str
+    notes: Optional[str] = None
     email: str
     height: float
     weight: float
+    plan_id:int
+    start_date: date=date.today()
 
 #CLIENTS
 
@@ -23,21 +27,47 @@ class client(BaseModel):
 @app.post("/clients/")
 def create_client(client: client):
     try:
-        database.cur.execute(
-            "INSERT INTO clients (clientname,phonenumber,dateofbirth,gender,bloodgroup,address,notes,email,height,weight) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-            (client.clientname, client.phonenumber, client.dateofbirth, client.gender, client.bloodgroup, client.address, client.notes, client.email, client.height, client.weight),
-        )
+        # 1) Fetch plan duration from plans table
+        database.cur.execute("SELECT days FROM plans WHERE id = %s", (client.plan_id,))
+        plan = database.cur.fetchone()
+        if not plan:
+            raise HTTPException(status_code=400, detail="Invalid plan ID")
+
+        duration = plan[0]  # 'days' column
+        end_date = client.start_date + timedelta(days=duration)
+
+        # 2) Insert into clients with plan_id, start_date, end_date
+        database.cur.execute("""
+            INSERT INTO clients
+                (clientname, phonenumber, dateofbirth, gender, bloodgroup,
+                 address, notes, email, height, weight,
+                 plan_id, start_date, end_date)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            RETURNING id
+        """, (
+            client.clientname, client.phonenumber, client.dateofbirth,
+            client.gender, client.bloodgroup, client.address, client.notes,
+            client.email, client.height, client.weight,
+            client.plan_id, client.start_date, end_date
+        ))
         database.conn.commit()
         client_id = database.cur.fetchone()[0]
-        return {"id": client_id, "message": "client created successfully"}
+        return {"id": client_id, "end_date": str(end_date), "message": "Client created successfully"}
+
     except Exception as e:
         database.conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-
 # ✅ Read All clients(total members)
 @app.get("/clients/")
 def get_clients():
-    database.cur.execute("SELECT id,clientname,phonenumber,dateofbirth,gender,bloodgroup,address,notes,email,height,weight FROM clients")
+    database.cur.execute("""
+        SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+               c.address, c.notes, c.email, c.height, c.weight,
+               c.start_date, c.end_date,
+               p.planname, p.days, p.amount
+        FROM clients c
+        JOIN plans p ON c.plan_id = p.id
+    """)
     clients = database.cur.fetchall()
     return {"clients": clients}
 
@@ -53,14 +83,32 @@ def get_client(client_id: int):
 # ✅ Update client(updating create page details we can add it in edit option)
 @app.put("/clients/{client_id}")
 def update_client(client_id: int, client: client):
-    database.cur.execute(
-        "UPDATE clients SET clientname = %s,phonenumber = %s,dateofbirth = %s,gender = %s,bloodgroup = %s,address = %s,notes = %s,email = %s,height = %s,weight = %s WHERE id = %s RETURNING id",
-        (client.clientname, client.phonenumber, client.dateofbirth, client.gender, client.bloodgroup, client.address, client.notes, client.email, client.height, client.weight,client_id),
-    )
+   # Fetch plan duration
+    database.cur.execute("SELECT days FROM plans WHERE id = %s", (client.plan_id,))
+    plan = database.cur.fetchone()
+    if not plan:
+        raise HTTPException(status_code=400, detail="Invalid plan ID")
+
+    duration = plan[0]
+    end_date = client.start_date + timedelta(days=duration)
+
+    database.cur.execute("""
+        UPDATE clients
+        SET clientname = %s, phonenumber = %s, dateofbirth = %s, gender = %s,
+            bloodgroup = %s, address = %s, notes = %s, email = %s,
+            height = %s, weight = %s, plan_id = %s, start_date = %s, end_date = %s
+        WHERE id = %s
+        RETURNING id
+    """, (
+        client.clientname, client.phonenumber, client.dateofbirth, client.gender,
+        client.bloodgroup, client.address, client.notes, client.email,
+        client.height, client.weight, client.plan_id, client.start_date, end_date,
+        client_id
+    ))
     database.conn.commit()
     if database.cur.rowcount == 0:
-        raise HTTPException(status_code=404, detail="client not found")
-    return {"message": "client updated successfully"}
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {"message": "Client updated successfully", "end_date": str(end_date)}
 
 # ✅ Delete client(deleting client we can add it in delete option)
 @app.delete("/clients/{client_id}")
@@ -98,7 +146,7 @@ def create_plan(plan: plan):
 # ✅ Read All plans(total plans)
 @app.get("/plans/")
 def get_plans():
-    database.cur.execute("SELECT id,planname,days,amount FROM plans")
+    database.cur.execute("SELECT id,planname,days,amount FROM plans order by id")
     plans = database.cur.fetchall()
     return {"plans": plans}
 
@@ -123,7 +171,7 @@ def delete_plan(plan_id: int):
         raise HTTPException(status_code=404, detail="plan not found")
     return {"message": "plan deleted successfully"}
 
-#staffs
+#STAFFS
 
 class staffs(BaseModel):
     staffname: str
@@ -173,3 +221,102 @@ def delete_staffs(staffs_id: int):
     if database.cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="staffs not found")
     return {"message": "staffs deleted successfully"}
+
+
+#Dashboard stats
+
+@app.get("/dashboard/stats")
+def dashboard_stats():
+    database.cur.execute("SELECT COUNT(*) FROM clients")
+    total = database.cur.fetchone()[0]
+
+    database.cur.execute("SELECT COUNT(*) FROM clients WHERE end_date >= CURRENT_DATE")
+    active = database.cur.fetchone()[0]
+
+    database.cur.execute("SELECT COUNT(*) FROM clients WHERE end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '10 days'")
+    expiring_10 = database.cur.fetchone()[0]
+
+    database.cur.execute("SELECT COUNT(*) FROM clients WHERE end_date < CURRENT_DATE AND end_date >= CURRENT_DATE - INTERVAL '30 days'")
+    expired_30 = database.cur.fetchone()[0]
+
+    return {
+        "total_members": total,
+        "active_members": active,
+        "expiring_in_10_days": expiring_10,
+        "expired_in_last_30_days": expired_30
+    }
+
+#dashboard card details where if i click the box i will see the details of the clients based on their status
+
+@app.get("/clients/filter/")
+def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")):
+    if status == "active":
+        query = """
+            SELECT c.id, c.clientname, c.phonenumber, c.email, c.start_date, c.end_date,
+                   p.planname, p.days, p.amount
+            FROM clients c
+            JOIN plans p ON c.plan_id = p.id
+            WHERE c.end_date >= CURRENT_DATE
+            ORDER BY c.end_date
+        """
+    elif status == "expiring":
+        query = """
+            SELECT c.id, c.clientname, c.phonenumber, c.email, c.start_date, c.end_date,
+                   p.planname, p.days, p.amount
+            FROM clients c
+            JOIN plans p ON c.plan_id = p.id
+            WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '10 days'
+            ORDER BY c.end_date
+        """
+    elif status == "expired":
+        query = """
+            SELECT c.id, c.clientname, c.phonenumber, c.email, c.start_date, c.end_date,
+                   p.planname, p.days, p.amount
+            FROM clients c
+            JOIN plans p ON c.plan_id = p.id
+            WHERE c.end_date < CURRENT_DATE
+              AND c.end_date >= CURRENT_DATE - INTERVAL '30 days'
+            ORDER BY c.end_date
+        """
+    else:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    database.cur.execute(query)
+    rows = database.cur.fetchall()
+    return {"status": status, "clients": rows}
+
+#leads
+
+class Lead(BaseModel):
+    name: str
+    phonenumber: str
+    notes: Optional[str] = None
+
+
+@app.post("/leads/")
+def create_lead(lead: Lead):
+    try:
+        database.cur.execute(
+            "INSERT INTO leads (name, phonenumber, notes) VALUES (%s, %s, %s) RETURNING id",
+            (lead.name, lead.phonenumber, lead.notes)
+        )
+        database.conn.commit()
+        lead_id = database.cur.fetchone()[0]
+        return {"id": lead_id, "message": "Lead added successfully"}
+    except Exception as e:
+        database.conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/leads/")
+def get_leads():
+    database.cur.execute("SELECT id, name, phonenumber, notes, created_at FROM leads ORDER BY created_at DESC")
+    leads = database.cur.fetchall()
+    return {"leads": leads}
+
+@app.delete("/leads/{lead_id}")
+def delete_lead(lead_id: int):
+    database.cur.execute("DELETE FROM leads WHERE id = %s RETURNING id", (lead_id,))
+    database.conn.commit()
+    if database.cur.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return {"message": "Lead deleted successfully"}

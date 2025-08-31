@@ -15,23 +15,27 @@ cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 # Ensure the table exists
 cur.execute("""
     CREATE TABLE IF NOT EXISTS clients (
-        id SERIAL PRIMARY KEY,
-        clientname VARCHAR(100) UNIQUE NOT NULL,
-        phonenumber BIGINT NOT NULL,
-        dateofbirth DATE NOT NULL,
-        gender VARCHAR(10) NOT NULL,
-        bloodgroup VARCHAR(5) NOT NULL,
-        address TEXT NOT NULL,
-        notes TEXT,     
-        email VARCHAR(100) UNIQUE NOT NULL,
-        height Float NOT NULL,
-        weight Float NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        
-    );
+    id SERIAL PRIMARY KEY,
+    clientname VARCHAR(100) UNIQUE NOT NULL,
+    phonenumber BIGINT NOT NULL,
+    dateofbirth DATE NOT NULL,
+    gender VARCHAR(10) NOT NULL,
+    bloodgroup VARCHAR(5) NOT NULL,
+    address TEXT NOT NULL,
+    notes TEXT,     
+    email VARCHAR(100) UNIQUE NOT NULL,
+    height FLOAT NOT NULL,
+    weight FLOAT NOT NULL,
+    plan_id INT REFERENCES plans(id) ON DELETE SET NULL,
+    start_date DATE,
+    end_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
             CREATE TABLE IF NOT EXISTS plans (
         id SERIAL PRIMARY KEY,
         planname VARCHAR(50) UNIQUE NOT NULL,
+            
         days int NOT NULL,
         amount NUMERIC(10,2)       
     );  
@@ -42,6 +46,15 @@ cur.execute("""
         phonenumber BIGINT NOT NULL,
         role VARCHAR(50) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP       
-    );         
+    );  
+
+            CREATE TABLE IF NOT EXISTS leads (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        phonenumber BIGINT NOT NULL,
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+       
 """)
 conn.commit()
