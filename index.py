@@ -1,10 +1,21 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from config import database  # Import database connection
 from datetime import date,timedelta
 from fastapi import Query
 from typing import Optional
+
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # ✅ client Model (Request Body)
 class client(BaseModel):
@@ -68,17 +79,50 @@ def get_clients():
         FROM clients c
         JOIN plans p ON c.plan_id = p.id
     """)
-    clients = database.cur.fetchall()
+    rows = database.cur.fetchall()
+    clients = []
+    for row in rows:
+        clients.append({
+            "id": row[0],
+            "clientname": row[1],
+            "phonenumber": str(row[2]),
+            "dateofbirth": str(row[3]),
+            "gender": row[4],
+            "bloodgroup": row[5],
+            "address": row[6],
+            "notes": row[7],
+            "email": row[8],
+            "height": float(row[9]),
+            "weight": float(row[10]),
+            "start_date": str(row[11]),
+            "end_date": str(row[12]) if row[12] else None,
+            "planname": row[13],
+            "days": row[14],
+            "amount": float(row[15]) if row[15] else None,
+        })
     return {"clients": clients}
 
 # ✅ Read Single client(use it as search function)
 @app.get("/clients/{client_id}")
 def get_client(client_id: int):
     database.cur.execute("SELECT id,clientname,phonenumber,dateofbirth,gender,bloodgroup,address,notes,email,height,weight FROM clients WHERE id = %s", (client_id,))
-    client = database.cur.fetchone()
-    if not client:
+    row = database.cur.fetchone()
+    if not row:
         raise HTTPException(status_code=404, detail="client not found")
-    return {"specific client detail":client}  
+    client = {
+        "id": row[0],
+        "clientname": row[1],
+        "phonenumber": str(row[2]),
+        "dateofbirth": str(row[3]),
+        "gender": row[4],
+        "bloodgroup": row[5],
+        "address": row[6],
+        "notes": row[7],
+        "email": row[8],
+        "height": float(row[9]),
+        "weight": float(row[10]),
+    }
+    return {"specific client detail": client}  
 
 # ✅ Update client(updating create page details we can add it in edit option)
 @app.put("/clients/{client_id}")
@@ -147,7 +191,15 @@ def create_plan(plan: plan):
 @app.get("/plans/")
 def get_plans():
     database.cur.execute("SELECT id,planname,days,amount FROM plans order by id")
-    plans = database.cur.fetchall()
+    rows = database.cur.fetchall()
+    plans = []
+    for row in rows:
+        plans.append({
+            "id": row[0],
+            "planname": row[1],
+            "days": row[2],
+            "amount": float(row[3]) if row[3] else None,
+        })
     return {"plans": plans}
 
 # ✅ Update plans(updating create plan details we can add it in edit option)
@@ -198,7 +250,16 @@ def create_staffs(staffs: staffs):
 @app.get("/staffs/")
 def get_staffs():
     database.cur.execute("SELECT id,staffname,email,phonenumber,role FROM staffs")
-    staffs = database.cur.fetchall()
+    rows = database.cur.fetchall()
+    staffs = []
+    for row in rows:
+        staffs.append({
+            "id": row[0],
+            "staffname": row[1],
+            "email": row[2],
+            "phonenumber": str(row[3]),
+            "role": row[4],
+        })
     return {"staffs": staffs}
 
 # ✅ Update staffs(updating staffs details we can add it in edit option)
@@ -283,7 +344,20 @@ def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")
 
     database.cur.execute(query)
     rows = database.cur.fetchall()
-    return {"status": status, "clients": rows}
+    clients = []
+    for row in rows:
+        clients.append({
+            "id": row[0],
+            "clientname": row[1],
+            "phonenumber": str(row[2]),
+            "email": row[3],
+            "start_date": str(row[4]),
+            "end_date": str(row[5]) if row[5] else None,
+            "planname": row[6],
+            "days": row[7],
+            "amount": float(row[8]) if row[8] else None,
+        })
+    return {"status": status, "clients": clients}
 
 #leads
 
@@ -310,7 +384,16 @@ def create_lead(lead: Lead):
 @app.get("/leads/")
 def get_leads():
     database.cur.execute("SELECT id, name, phonenumber, notes, created_at FROM leads ORDER BY created_at DESC")
-    leads = database.cur.fetchall()
+    rows = database.cur.fetchall()
+    leads = []
+    for row in rows:
+        leads.append({
+            "id": row[0],
+            "name": row[1],
+            "phonenumber": str(row[2]),
+            "notes": row[3],
+            "created_at": str(row[4]) if row[4] else None,
+        })
     return {"leads": leads}
 
 @app.delete("/leads/{lead_id}")
