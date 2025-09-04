@@ -491,7 +491,9 @@ def dashboard_stats():
 def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")):
     if status == "active":
         query = """
-            SELECT c.id, c.clientname, c.phonenumber, c.email, c.start_date, c.end_date,
+            SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+                   c.address, c.notes, c.email, c.height, c.weight,
+                   c.start_date, c.end_date,
                    p.planname, p.days, p.amount
             FROM clients c
             JOIN plans p ON c.plan_id = p.id
@@ -500,7 +502,9 @@ def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")
         """
     elif status == "expiring":
         query = """
-            SELECT c.id, c.clientname, c.phonenumber, c.email, c.start_date, c.end_date,
+            SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+                   c.address, c.notes, c.email, c.height, c.weight,
+                   c.start_date, c.end_date,
                    p.planname, p.days, p.amount
             FROM clients c
             JOIN plans p ON c.plan_id = p.id
@@ -508,15 +512,17 @@ def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")
             ORDER BY c.end_date
         """
     elif status == "expired":
-        query = """
-            SELECT c.id, c.clientname, c.phonenumber, c.email, c.start_date, c.end_date,
-                   p.planname, p.days, p.amount
-            FROM clients c
-            JOIN plans p ON c.plan_id = p.id
-            WHERE c.end_date < CURRENT_DATE
-              AND c.end_date >= CURRENT_DATE - INTERVAL '30 days'
-            ORDER BY c.end_date
-        """
+                query = """
+                        SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+                                     c.address, c.notes, c.email, c.height, c.weight,
+                                     c.start_date, c.end_date,
+                                     p.planname, p.days, p.amount
+                        FROM clients c
+                        JOIN plans p ON c.plan_id = p.id
+                        WHERE c.end_date < CURRENT_DATE
+                            AND c.end_date >= CURRENT_DATE - INTERVAL '30 days'
+                        ORDER BY c.end_date
+                """
     else:
         raise HTTPException(status_code=400, detail="Invalid status")
 
@@ -528,12 +534,19 @@ def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")
             "id": row[0],
             "clientname": row[1],
             "phonenumber": str(row[2]),
-            "email": row[3],
-            "start_date": str(row[4]),
-            "end_date": str(row[5]) if row[5] else None,
-            "planname": row[6],
-            "days": row[7],
-            "amount": float(row[8]) if row[8] else None,
+            "dateofbirth": str(row[3]) if row[3] else None,
+            "gender": row[4],
+            "bloodgroup": row[5],
+            "address": row[6],
+            "notes": row[7],
+            "email": row[8],
+            "height": float(row[9]) if row[9] else None,
+            "weight": float(row[10]) if row[10] else None,
+            "start_date": str(row[11]),
+            "end_date": str(row[12]) if row[12] else None,
+            "planname": row[13],
+            "days": row[14],
+            "amount": float(row[15]) if row[15] else None,
         })
     return {"status": status, "clients": clients}
 
