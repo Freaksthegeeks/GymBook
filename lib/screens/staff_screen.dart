@@ -185,100 +185,146 @@ class _StaffScreenState extends State<StaffScreen> {
     final nameController = TextEditingController(text: staff?.staffname ?? '');
     final emailController = TextEditingController(text: staff?.email ?? '');
     final phoneController = TextEditingController(text: staff?.phonenumber.toString() ?? '');
-    final roleController = TextEditingController(text: staff?.role ?? '');
+    final customRoleController = TextEditingController(text: staff?.role ?? '');
+    final List<String> roleOptions = ['Admin', 'Senior Trainer', 'Junior Trainer', 'Custom'];
+    String selectedRole = 'Admin';
+    if (staff != null) {
+      if (roleOptions.contains(staff.role)) {
+        selectedRole = staff.role;
+      } else {
+        selectedRole = 'Custom';
+      }
+    }
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(staff != null ? 'Edit Staff' : 'Add Staff'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Staff Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: phoneController,
-              decoration: const InputDecoration(
-                labelText: 'Phone Number',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: roleController,
-              decoration: const InputDecoration(
-                labelText: 'Role',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isEmpty ||
-                  emailController.text.isEmpty ||
-                  phoneController.text.isEmpty ||
-                  roleController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please fill all fields')),
-                );
-                return;
-              }
-
-              final newStaff = Staff(
-                staffname: nameController.text,
-                email: emailController.text,
-                phonenumber: int.parse(phoneController.text),
-                role: roleController.text,
-              );
-
-              try {
-                if (staff != null) {
-                  await context.read<GymProvider>().updateStaff(staff.id!, newStaff);
-                } else {
-                  await context.read<GymProvider>().createStaff(newStaff);
-                }
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(staff != null ? 'Staff updated successfully' : 'Staff added successfully'),
-                    backgroundColor: AppTheme.successColor,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(staff != null ? 'Edit Staff' : 'Add Staff'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Staff Name',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: ${e.toString()}'),
-                    backgroundColor: AppTheme.errorColor,
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
                   ),
-                );
-              }
-            },
-            child: Text(staff != null ? 'Update' : 'Add'),
-          ),
-        ],
-      ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: phoneController,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: roleOptions.contains(staff?.role) ? staff?.role : (selectedRole == 'Custom' ? 'Custom' : selectedRole),
+                    decoration: const InputDecoration(
+                      labelText: 'Role',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: roleOptions
+                        .map((r) => DropdownMenuItem<String>(
+                              value: r,
+                              child: Text(r),
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val == null) return;
+                      setState(() {
+                        selectedRole = val;
+                        if (selectedRole != 'Custom') {
+                          customRoleController.text = selectedRole;
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  if (selectedRole == 'Custom')
+                    Column(
+                      children: [
+                        TextField(
+                          controller: customRoleController,
+                          decoration: const InputDecoration(
+                            labelText: 'Custom Role',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final roleValue = selectedRole == 'Custom' ? customRoleController.text : selectedRole;
+
+                    if (nameController.text.isEmpty ||
+                        emailController.text.isEmpty ||
+                        phoneController.text.isEmpty ||
+                        roleValue.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please fill all fields')),
+                      );
+                      return;
+                    }
+
+                    final newStaff = Staff(
+                      staffname: nameController.text,
+                      email: emailController.text,
+                      phonenumber: int.parse(phoneController.text),
+                      role: roleValue,
+                    );
+
+                    try {
+                      if (staff != null) {
+                        await context.read<GymProvider>().updateStaff(staff.id!, newStaff);
+                      } else {
+                        await context.read<GymProvider>().createStaff(newStaff);
+                      }
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(staff != null ? 'Staff updated successfully' : 'Staff added successfully'),
+                          backgroundColor: AppTheme.successColor,
+                        ),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: ${e.toString()}'),
+                          backgroundColor: AppTheme.errorColor,
+                        ),
+                      );
+                    }
+                  },
+                  child: Text(staff != null ? 'Update' : 'Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

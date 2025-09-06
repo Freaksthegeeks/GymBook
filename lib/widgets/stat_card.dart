@@ -7,6 +7,8 @@ class StatCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback? onTap;
+  final List<String>? filters;
+  final ValueChanged<String>? onFilterTap;
 
   const StatCard({
     super.key,
@@ -14,7 +16,9 @@ class StatCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
-    this.onTap,
+  this.onTap,
+  this.filters,
+  this.onFilterTap,
   });
 
   @override
@@ -68,6 +72,27 @@ class StatCard extends StatelessWidget {
                   color: AppTheme.textSecondaryColor,
                 ),
               ),
+              const SizedBox(height: 8),
+              if (filters != null && filters!.isNotEmpty)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: filters!.map((f) {
+                    String key = (() {
+                      final l = f.toLowerCase();
+                      if (l.contains('all')) return 'all';
+                      if (l.contains('active')) return 'active';
+                      if (l.contains('expir')) return 'expiring';
+                      if (l.contains('expired')) return 'expired';
+                      return l.replaceAll(RegExp(r'[^a-z0-9]'), '_');
+                    })();
+
+                    return ActionChip(
+                      label: Text(f),
+                      onPressed: onFilterTap != null ? () => onFilterTap!(key) : null,
+                    );
+                  }).toList(),
+                ),
             ],
           ),
         ),

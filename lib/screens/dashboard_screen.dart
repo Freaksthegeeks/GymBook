@@ -112,80 +112,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   else
                     Column(
                       children: [
-                        // Stats Row 1
+                        // Stats Row 1 (reordered): Active, Expiring Soon
                         Row(
                           children: [
                             Expanded(
                               child: StatCard(
-                                title: 'Total Members',
-                                value: '${gymProvider.dashboardStats['total_members'] ?? 0}',
-                                icon: Icons.people,
-                                color: AppTheme.primaryColor,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const MembersScreen(initialFilter: 'all', showFilters: true),
-                                    ),
-                                  );
-                                },
-                              ),
+                                  title: 'Active Members',
+                                  value: '${gymProvider.dashboardStats['active_members'] ?? 0}',
+                                  icon: Icons.check_circle,
+                                  color: AppTheme.successColor,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const MembersScreen(initialFilter: 'active', showFilters: true),
+                                      ),
+                                    );
+                                  },
+                                ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: StatCard(
-                                title: 'Active Members',
-                                value: '${gymProvider.dashboardStats['active_members'] ?? 0}',
-                                icon: Icons.check_circle,
-                                color: AppTheme.successColor,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const MembersScreen(initialFilter: 'active', showFilters: false),
-                                    ),
-                                  );
-                                },
-                              ),
+                                  title: 'Expiring Soon',
+                                  value: '${gymProvider.dashboardStats['expiring_in_10_days'] ?? 0}',
+                                  icon: Icons.warning,
+                                  color: AppTheme.warningColor,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const MembersScreen(initialFilter: 'expiring', showFilters: true),
+                                      ),
+                                    );
+                                  },
+                                ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Stats Row 2
+                        // Stats Row 2 (reordered): Recently Expired, Total Members (last)
                         Row(
                           children: [
                             Expanded(
                               child: StatCard(
-                                title: 'Expiring Soon',
-                                value: '${gymProvider.dashboardStats['expiring_in_10_days'] ?? 0}',
-                                icon: Icons.warning,
-                                color: AppTheme.warningColor,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const MembersScreen(initialFilter: 'expiring', showFilters: false),
-                                    ),
-                                  );
-                                },
-                              ),
+                                  title: 'Recently Expired',
+                                  value: '${gymProvider.dashboardStats['expired_in_last_30_days'] ?? 0}',
+                                  icon: Icons.cancel,
+                                  color: AppTheme.errorColor,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const MembersScreen(initialFilter: 'expired', showFilters: true),
+                                      ),
+                                    );
+                                  },
+                                ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: StatCard(
-                                title: 'Recently Expired',
-                                value: '${gymProvider.dashboardStats['expired_in_last_30_days'] ?? 0}',
-                                icon: Icons.cancel,
-                                color: AppTheme.errorColor,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const MembersScreen(initialFilter: 'expired', showFilters: false),
-                                    ),
-                                  );
-                                },
-                              ),
+                                  title: 'Total Members',
+                                  value: '${gymProvider.dashboardStats['total_members'] ?? 0}',
+                                  icon: Icons.people,
+                                  color: AppTheme.primaryColor,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const MembersScreen(initialFilter: 'all', showFilters: true),
+                                      ),
+                                    );
+                                  },
+                                ),
                             ),
                           ],
                         ),
