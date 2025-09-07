@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Colors
-  static const Color primaryColor = Color(0xFF6366F1);
-  static const Color secondaryColor = Color(0xFF8B5CF6);
-  static const Color accentColor = Color(0xFF06B6D4);
-  static const Color backgroundColor = Color(0xFFF8FAFC);
+  // Colors (UI Style Guide palette for GymEdge)
+  static const Color primaryColor = Color(0xFF1E1E2F); // dark navy / charcoal
+  static const Color secondaryColor = Color(0xFF1E90FF); // vibrant blue (can use green 0xFF28A745)
+  static const Color accentColor = Color(0xFF28A745);
+  static const Color backgroundColor = Color(0xFFF5F5F5); // light gray
   static const Color surfaceColor = Color(0xFFFFFFFF);
   static const Color textPrimaryColor = Color(0xFF1E293B);
   static const Color textSecondaryColor = Color(0xFF64748B);
@@ -22,7 +22,7 @@ class AppTheme {
         seedColor: primaryColor,
         brightness: Brightness.light,
       ),
-      scaffoldBackgroundColor: backgroundColor,
+  scaffoldBackgroundColor: backgroundColor,
       appBarTheme: const AppBarTheme(
         backgroundColor: surfaceColor,
         foregroundColor: textPrimaryColor,
@@ -36,17 +36,17 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: surfaceColor,
-        elevation: 2,
+        elevation: 8, // soft shadow
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24), // rounded-2xl
         ),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
-          elevation: 0,
+          elevation: 4,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -55,6 +55,12 @@ class AppTheme {
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: secondaryColor,
+          textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -79,63 +85,76 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         hintStyle: const TextStyle(color: textSecondaryColor),
       ),
+      // Typography: prefer Montserrat/Poppins for headings and Inter/Roboto for body.
       textTheme: const TextTheme(
         displayLarge: TextStyle(
+          fontFamily: 'Montserrat',
           fontSize: 32,
           fontWeight: FontWeight.bold,
           color: textPrimaryColor,
         ),
         displayMedium: TextStyle(
+          fontFamily: 'Montserrat',
           fontSize: 28,
           fontWeight: FontWeight.bold,
           color: textPrimaryColor,
         ),
         displaySmall: TextStyle(
+          fontFamily: 'Montserrat',
           fontSize: 24,
           fontWeight: FontWeight.w600,
           color: textPrimaryColor,
         ),
         headlineLarge: TextStyle(
+          fontFamily: 'Poppins',
           fontSize: 22,
           fontWeight: FontWeight.w600,
           color: textPrimaryColor,
         ),
         headlineMedium: TextStyle(
+          fontFamily: 'Poppins',
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: textPrimaryColor,
         ),
         headlineSmall: TextStyle(
+          fontFamily: 'Poppins',
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: textPrimaryColor,
         ),
         titleLarge: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: textPrimaryColor,
         ),
         titleMedium: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 14,
           fontWeight: FontWeight.w500,
           color: textPrimaryColor,
         ),
         titleSmall: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 12,
           fontWeight: FontWeight.w500,
           color: textSecondaryColor,
         ),
         bodyLarge: TextStyle(
+          fontFamily: 'Roboto',
           fontSize: 16,
           fontWeight: FontWeight.normal,
           color: textPrimaryColor,
         ),
         bodyMedium: TextStyle(
+          fontFamily: 'Roboto',
           fontSize: 14,
           fontWeight: FontWeight.normal,
           color: textPrimaryColor,
         ),
         bodySmall: TextStyle(
+          fontFamily: 'Roboto',
           fontSize: 12,
           fontWeight: FontWeight.normal,
           color: textSecondaryColor,

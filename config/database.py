@@ -62,6 +62,23 @@ cur.execute("""
         password VARCHAR(100) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
-       
+        -- Stores all payments made by clients
+CREATE TABLE IF NOT EXISTS payments (
+    id SERIAL PRIMARY KEY,
+    client_id INT REFERENCES clients(id) ON DELETE CASCADE,
+    amount NUMERIC(10,2) NOT NULL,
+    paid_on DATE NOT NULL DEFAULT CURRENT_DATE,
+    due_date DATE,
+    notes TEXT
+);
+
+-- Keeps running balance (optional but helpful for quick lookup)
+CREATE TABLE IF NOT EXISTS client_balance (
+    client_id INT PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+    total_paid NUMERIC(10,2) DEFAULT 0,
+    total_due NUMERIC(10,2) DEFAULT 0,
+    last_payment DATE
+);
+
 """)
 conn.commit()

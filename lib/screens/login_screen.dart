@@ -16,6 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -23,6 +25,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+  _emailFocus.dispose();
+  _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -122,7 +126,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 48),
                 // Email Field
                 TextFormField(
+                  focusNode: _emailFocus,
                   controller: _emailController,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocus),
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     labelText: 'Email',
@@ -142,8 +149,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 20),
                 // Password Field
                 TextFormField(
+                  focusNode: _passwordFocus,
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _login(),
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outlined),
@@ -172,6 +182,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 32),
                 // Login Button
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                   onPressed: _isLoading ? null : _login,
                   child: _isLoading
                       ? const SizedBox(

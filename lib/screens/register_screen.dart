@@ -16,6 +16,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _usernameFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _confirmPasswordFocus = FocusNode();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -25,6 +29,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+  _usernameFocus.dispose();
+  _emailFocus.dispose();
+  _passwordFocus.dispose();
+  _confirmPasswordFocus.dispose();
     super.dispose();
   }
 
@@ -103,6 +111,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         // Username Field
                         TextFormField(
+                          focusNode: _usernameFocus,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_emailFocus),
                           controller: _usernameController,
                           decoration: const InputDecoration(
                             labelText: 'Username',
@@ -123,6 +134,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         // Email Field
                         TextFormField(
+                          focusNode: _emailFocus,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocus),
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           decoration: const InputDecoration(
@@ -134,7 +148,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             if (value == null || value.trim().isEmpty) {
                               return 'Please enter an email';
                             }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}\$')
                                 .hasMatch(value)) {
                               return 'Please enter a valid email';
                             }
@@ -145,6 +159,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         // Password Field
                         TextFormField(
+                          focusNode: _passwordFocus,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_confirmPasswordFocus),
                           controller: _passwordController,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
@@ -178,6 +195,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         // Confirm Password Field
                         TextFormField(
+                          focusNode: _confirmPasswordFocus,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _register(),
                           controller: _confirmPasswordController,
                           obscureText: _obscureConfirmPassword,
                           decoration: InputDecoration(
@@ -241,13 +261,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             builder: (context, authProvider, child) {
                               return ElevatedButton(
                                 onPressed: authProvider.isLoading ? null : _register,
-                                                                 style: ElevatedButton.styleFrom(
-                                   backgroundColor: AppTheme.primaryColor,
-                                   foregroundColor: Colors.white,
-                                   shape: RoundedRectangleBorder(
-                                     borderRadius: BorderRadius.circular(8),
-                                   ),
-                                 ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryColor,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
                                 child: authProvider.isLoading
                                     ? const SizedBox(
                                         height: 20,
