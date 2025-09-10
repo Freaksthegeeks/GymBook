@@ -5,6 +5,7 @@ import 'package:gym_booking_app/models/client.dart';
 import 'package:gym_booking_app/utils/theme.dart';
 import 'package:gym_booking_app/widgets/member_card.dart';
 import 'package:gym_booking_app/screens/add_member_screen.dart';
+import 'package:gym_booking_app/screens/payment_screen.dart';
 
 class MembersScreen extends StatefulWidget {
   final String? initialFilter;
@@ -375,6 +376,16 @@ class _MembersScreenState extends State<MembersScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PaymentScreen(client: client)),
+              );
+            },
+            child: const Text('Payments'),
+          ),
           TextButton(
             onPressed: () async {
               Navigator.of(context).pop();

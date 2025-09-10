@@ -1,3 +1,3 @@
-from . import clients, plans, staffs, leads, dashboard
+from . import clients, plans, staffs, leads, dashboard, payments
 
-__all__ = ["clients", "plans", "staffs", "leads", "dashboard"]
+__all__ = ["clients", "plans", "staffs", "leads", "dashboard", "payments"]

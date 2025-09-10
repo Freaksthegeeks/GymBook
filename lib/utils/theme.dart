@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // Colors (UI Style Guide palette for GymEdge)
-  static const Color primaryColor = Color(0xFF1E1E2F); // dark navy / charcoal
-  static const Color secondaryColor = Color(0xFF1E90FF); // vibrant blue (can use green 0xFF28A745)
-  static const Color accentColor = Color(0xFF28A745);
+  static const Color primaryColor = Color(0xFF0F172A); // Slate-900
+  static const Color secondaryColor = Color(0xFF22D3EE); // Cyan-400 accent
+  static const Color accentColor = Color(0xFF8B5CF6); // Violet-500
   static const Color backgroundColor = Color(0xFFF5F5F5); // light gray
   static const Color surfaceColor = Color(0xFFFFFFFF);
   static const Color textPrimaryColor = Color(0xFF1E293B);
@@ -23,6 +23,16 @@ class AppTheme {
         brightness: Brightness.light,
       ),
   scaffoldBackgroundColor: backgroundColor,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: surfaceColor,
         foregroundColor: textPrimaryColor,
@@ -36,15 +46,15 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: surfaceColor,
-        elevation: 8, // soft shadow
+        elevation: 6,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24), // rounded-2xl
+          borderRadius: BorderRadius.circular(20),
         ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
+          backgroundColor: accentColor,
           foregroundColor: Colors.white,
           elevation: 4,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -76,7 +86,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryColor, width: 2),
+          borderSide: const BorderSide(color: accentColor, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -88,19 +98,19 @@ class AppTheme {
       // Typography: prefer Montserrat/Poppins for headings and Inter/Roboto for body.
       textTheme: const TextTheme(
         displayLarge: TextStyle(
-          fontFamily: 'Montserrat',
+          fontFamily: 'Poppins',
           fontSize: 32,
           fontWeight: FontWeight.bold,
           color: textPrimaryColor,
         ),
         displayMedium: TextStyle(
-          fontFamily: 'Montserrat',
+          fontFamily: 'Poppins',
           fontSize: 28,
           fontWeight: FontWeight.bold,
           color: textPrimaryColor,
         ),
         displaySmall: TextStyle(
-          fontFamily: 'Montserrat',
+          fontFamily: 'Poppins',
           fontSize: 24,
           fontWeight: FontWeight.w600,
           color: textPrimaryColor,
@@ -169,6 +179,16 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(seedColor: primaryColor, brightness: Brightness.dark),
       scaffoldBackgroundColor: const Color(0xFF0F172A),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF0B1220),
         foregroundColor: Colors.white,

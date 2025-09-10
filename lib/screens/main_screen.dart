@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/gym_provider.dart';
 import '../providers/theme_provider.dart';
 import 'dashboard_screen.dart';
 import 'members_screen.dart';
@@ -8,6 +9,7 @@ import 'plans_screen.dart';
 import 'staff_screen.dart';
 import 'leads_screen.dart';
 import 'login_screen.dart';
+import 'payments_home.dart';
 import '../utils/theme.dart';
 
 class MainScreen extends StatefulWidget {
@@ -54,6 +56,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: _buildDrawer(context),
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -153,6 +156,105 @@ class _MainScreenState extends State<MainScreen> {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
       (route) => false,
+    );
+  }
+
+  Drawer _buildDrawer(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            UserAccountsDrawerHeader(
+              accountName: Text(auth.user?.username ?? 'Guest'),
+              accountEmail: Text(auth.user?.email ?? ''),
+              currentAccountPicture: const CircleAvatar(child: Icon(Icons.person)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.dashboard),
+              title: const Text('Dashboard'),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentIndex = 0);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people),
+              title: const Text('Members'),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentIndex = 1);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.card_membership),
+              title: const Text('Plans'),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentIndex = 2);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Staff'),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentIndex = 3);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.phone),
+              title: const Text('Leads'),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _currentIndex = 4);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.payments),
+              title: const Text('Payment Portal'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PaymentsHome()),
+                );
+              },
+            ),
+            Consumer<GymProvider>(
+              builder: (context, gym, _) {
+                final now = DateTime.now();
+                final todays = gym.clients.where((c) {
+                  try {
+                    final dob = DateTime.parse(c.dateofbirth);
+                    return dob.month == now.month && dob.day == now.day;
+                  } catch (_) {
+                    return false;
+                  }
+                }).toList();
+                if (todays.isEmpty) return const SizedBox.shrink();
+                return ExpansionTile(
+                  leading: const Icon(Icons.cake),
+                  title: const Text("Today's Birthdays"),
+                  children: todays
+                      .map((c) => ListTile(
+                            title: Text(c.clientname),
+                            subtitle: Text('Phone: ${c.phonenumber}'),
+                          ))
+                      .toList(),
+                );
+              },
+            ),
+            const Spacer(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: _showLogoutDialog,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

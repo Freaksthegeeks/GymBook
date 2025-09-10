@@ -177,3 +177,32 @@ class ApiService {
     return _handleResponse(response);
   }
 }
+
+// Payments API helpers are colocated for simplicity; you can move to a separate service if desired.
+extension PaymentsApi on ApiService {
+  static Future<Map<String, dynamic>> getPayments({int? clientId}) async {
+    final query = clientId != null ? '?client_id=$clientId' : '';
+    final response = await http.get(
+      Uri.parse('${ApiService.baseUrl}/payments/$query'),
+      headers: ApiService._headers,
+    );
+    return ApiService._handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createPayment(Map<String, dynamic> paymentData) async {
+    final response = await http.post(
+      Uri.parse('${ApiService.baseUrl}/payments/'),
+      headers: ApiService._headers,
+      body: json.encode(paymentData),
+    );
+    return ApiService._handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getClientPayments(int clientId) async {
+    final response = await http.get(
+      Uri.parse('${ApiService.baseUrl}/payments/?client_id=$clientId'),
+      headers: ApiService._headers,
+    );
+    return ApiService._handleResponse(response);
+  }
+}

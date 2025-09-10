@@ -139,6 +139,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocus),
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.username, AutofillHints.email],
                           decoration: const InputDecoration(
                             labelText: 'Email',
                             prefixIcon: Icon(Icons.email),
@@ -181,6 +182,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               },
                             ),
                           ),
+                          autofillHints: const [AutofillHints.newPassword],
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter a password';
@@ -217,6 +219,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               },
                             ),
                           ),
+                          autofillHints: const [AutofillHints.password],
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please confirm your password';

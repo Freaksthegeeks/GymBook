@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/gym_provider.dart';
+import 'providers/payment_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
@@ -19,6 +20,7 @@ class GymBookingApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => GymProvider()),
+        ChangeNotifierProvider(create: (_) => PaymentProvider()),
   ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: Consumer<ThemeProvider>(

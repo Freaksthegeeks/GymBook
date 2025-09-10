@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../screens/main_screen.dart';
 import '../utils/theme.dart';
 import 'register_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,6 +21,22 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordFocus = FocusNode();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  @override
+  void initState() {
+    super.initState();
+    _loadLastEmail();
+  }
+
+  Future<void> _loadLastEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastEmail = prefs.getString('last_email');
+      if (lastEmail != null && lastEmail.isNotEmpty) {
+        _emailController.text = lastEmail;
+      }
+    } catch (_) {}
+  }
+
 
   @override
   void dispose() {
@@ -43,6 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+
+      // persist last email
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_email', _emailController.text.trim());
 
       if (success && mounted) {
         Navigator.of(context).pushReplacement(
@@ -131,6 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocus),
                   keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.username, AutofillHints.email],
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
@@ -169,6 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     hintText: 'Enter your password',
                   ),
+                  autofillHints: const [AutofillHints.password],
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your password';

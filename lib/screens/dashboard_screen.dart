@@ -22,6 +22,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GymProvider>().loadDashboardStats();
+      context.read<GymProvider>().loadClients();
     });
   }
 
@@ -78,6 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  // (Birthdays moved below Quick Actions)
                   // Stats Grid
                   if (gymProvider.isLoading)
                     const Center(
@@ -205,9 +207,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
+                    crossAxisCount: 3,
                     crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
+                    mainAxisSpacing: 12,
                     children: [
                       _buildQuickActionCard(
                         'Add Member',
@@ -263,6 +265,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 24),
+                  // Today's Birthdays
+                  _TodaysBirthdaysSection(),
                 ],
               ),
             ),
@@ -283,27 +288,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
-                  size: 32,
+                  size: 26,
                   color: color,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimaryColor,
                 ),
@@ -313,6 +318,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TodaysBirthdaysSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<GymProvider>(
+      builder: (context, gym, child) {
+        final now = DateTime.now();
+        final birthdays = gym.clients.where((c) {
+          try {
+            final dob = DateTime.parse(c.dateofbirth);
+            return dob.month == now.month && dob.day == now.day;
+          } catch (_) {
+            return false;
+          }
+        }).toList();
+        if (birthdays.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Today's Birthdays",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: birthdays
+                  .map((c) => Chip(
+                        avatar: const Icon(Icons.cake, size: 16),
+                        label: Text(c.clientname),
+                      ))
+                  .toList(),
+            ),
+          ],
+        );
+      },
     );
   }
 }

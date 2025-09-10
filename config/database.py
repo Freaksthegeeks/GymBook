@@ -64,12 +64,13 @@ cur.execute("""
     );
         -- Stores all payments made by clients
 CREATE TABLE IF NOT EXISTS payments (
-    id SERIAL PRIMARY KEY,
-    client_id INT REFERENCES clients(id) ON DELETE CASCADE,
-    amount NUMERIC(10,2) NOT NULL,
-    paid_on DATE NOT NULL DEFAULT CURRENT_DATE,
-    due_date DATE,
-    notes TEXT
+  id SERIAL PRIMARY KEY,
+  client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  amount NUMERIC(12,2) NOT NULL,
+  paid_at TIMESTAMP NOT NULL,
+  note TEXT,
+  method VARCHAR(32),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- Keeps running balance (optional but helpful for quick lookup)
