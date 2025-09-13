@@ -4,6 +4,7 @@ import 'package:gym_booking_app/providers/gym_provider.dart';
 import 'package:gym_booking_app/models/client.dart';
 import 'package:gym_booking_app/models/plan.dart';
 import 'package:gym_booking_app/utils/theme.dart';
+import 'package:gym_booking_app/screens/main_screen.dart';
 
 class AddMemberScreen extends StatefulWidget {
   final Client? client; // For editing existing member
@@ -177,6 +178,15 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.client != null ? 'Edit Member' : 'Add Member'),
+        leading: IconButton(
+          icon: const Icon(Icons.home),
+          onPressed: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainScreen()),
+              (route) => false,
+            );
+          },
+        ),
       ),
       body: Form(
         key: _formKey,

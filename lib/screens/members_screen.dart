@@ -6,12 +6,14 @@ import 'package:gym_booking_app/utils/theme.dart';
 import 'package:gym_booking_app/widgets/member_card.dart';
 import 'package:gym_booking_app/screens/add_member_screen.dart';
 import 'package:gym_booking_app/screens/payment_screen.dart';
+import 'package:gym_booking_app/screens/main_screen.dart';
 
 class MembersScreen extends StatefulWidget {
   final String? initialFilter;
   final bool showFilters;
+  final String? title;
 
-  const MembersScreen({super.key, this.initialFilter, this.showFilters = true});
+  const MembersScreen({super.key, this.initialFilter, this.showFilters = true, this.title});
 
   @override
   State<MembersScreen> createState() => _MembersScreenState();
@@ -108,7 +110,30 @@ class _MembersScreenState extends State<MembersScreen> {
         return Consumer<GymProvider>(
       builder: (context, gymProvider, child) {
 
+        final pageTitle = widget.title ??
+            (_selectedFilter == 'all'
+                ? 'Total Members'
+                : _selectedFilter == 'active'
+                    ? 'Active Members'
+                    : _selectedFilter == 'expiring'
+                        ? 'Expiring Soon'
+                        : _selectedFilter == 'expired'
+                            ? 'Expired Members'
+                            : 'Members');
+
         return Scaffold(
+          appBar: AppBar(
+            title: Text(pageTitle),
+            leading: IconButton(
+              icon: const Icon(Icons.home),
+              onPressed: () {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const MainScreen()),
+                  (route) => false,
+                );
+              },
+            ),
+          ),
           body: Column(
             children: [
               // Search and Filter Bar

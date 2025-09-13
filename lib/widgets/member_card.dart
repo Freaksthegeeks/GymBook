@@ -78,6 +78,9 @@ class MemberCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  // Status pill
+                  _buildStatusPill(),
+                  const SizedBox(width: 8),
                   // Action Buttons
                   if (onEdit != null || onDelete != null)
                     PopupMenuButton<String>(
@@ -190,6 +193,107 @@ class MemberCard extends StatelessWidget {
     } catch (e) {
       return 'N/A';
     }
+  }
+
+  // Builds the status chip with a colored dot and dynamic text based on end date
+  Widget _buildStatusPill() {
+    final status = _computeStatus();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: status.backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: status.borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: status.dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            status.label,
+            style: const TextStyle(fontSize: 12, color: AppTheme.textPrimaryColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  _MembershipStatus _computeStatus() {
+    if (client.endDate == null || client.endDate!.isEmpty) {
+      return _MembershipStatus.active();
+    }
+
+    final DateTime? endDate = DateTime.tryParse(client.endDate!);
+    if (endDate == null) {
+      return _MembershipStatus.active();
+    }
+
+    final DateTime today = DateTime.now();
+    final DateTime end = DateTime(endDate.year, endDate.month, endDate.day);
+    final DateTime now = DateTime(today.year, today.month, today.day);
+    final int daysRemaining = end.difference(now).inDays;
+
+    if (daysRemaining < 0) {
+      final int daysAgo = -daysRemaining;
+      return _MembershipStatus.expired(daysAgo);
+    }
+
+    if (daysRemaining <= 15) {
+      return _MembershipStatus.expiring(daysRemaining);
+    }
+
+    return _MembershipStatus.active();
+  }
+}
+
+class _MembershipStatus {
+  final String label;
+  final Color dotColor;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  _MembershipStatus({
+    required this.label,
+    required this.dotColor,
+    required this.backgroundColor,
+    required this.borderColor,
+  });
+
+  factory _MembershipStatus.active() {
+    return _MembershipStatus(
+      label: 'Active',
+      dotColor: Colors.green,
+      backgroundColor: const Color(0xFFE9F7EF),
+      borderColor: const Color(0xFFBFE5CD),
+    );
+  }
+
+  factory _MembershipStatus.expiring(int days) {
+    final plural = days == 1 ? 'day' : 'days';
+    return _MembershipStatus(
+      label: 'Expiring in $days $plural',
+      dotColor: Colors.orange,
+      backgroundColor: const Color(0xFFFFF5E6),
+      borderColor: const Color(0xFFFFE0B2),
+    );
+  }
+
+  factory _MembershipStatus.expired(int daysAgo) {
+    final plural = daysAgo == 1 ? 'day' : 'days';
+    return _MembershipStatus(
+      label: 'Expired $daysAgo $plural ago',
+      dotColor: Colors.red,
+      backgroundColor: const Color(0xFFFFEBEE),
+      borderColor: const Color(0xFFF5C6CB),
+    );
   }
 }
 

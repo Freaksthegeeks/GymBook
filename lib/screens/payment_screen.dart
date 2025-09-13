@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:gym_booking_app/models/client.dart';
 import 'package:gym_booking_app/models/payment.dart';
 import 'package:gym_booking_app/providers/payment_provider.dart';
+import 'package:gym_booking_app/screens/main_screen.dart';
 import 'package:gym_booking_app/utils/theme.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -42,9 +43,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
         final totalPaid = payments.fold<double>(0.0, (s, p) => s + p.amount);
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text('Payments • ${widget.client.clientname}'),
-          ),
+              appBar: AppBar(
+                title: Text('Payments • '),
+                leading: IconButton(
+                  icon: const Icon(Icons.home),
+                  onPressed: () {
+                    // Navigate to main home screen
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const MainScreen()),
+                      (route) => false,
+                    );
+                  },
+                ),
+              ),
           body: RefreshIndicator(
             onRefresh: () => paymentProvider.loadPaymentsForClient(widget.client.id!),
             child: ListView(
@@ -92,21 +103,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Plan: ${widget.client.planName ?? 'N/A'} • ${widget.client.planDays ?? 0} days'),
+          Text('Plan:  •  days'),
           const SizedBox(height: 4),
-          Text('Plan Amount: ${planAmount.toStringAsFixed(2)}'),
+          Text('Plan Amount: '),
           const SizedBox(height: 4),
           TweenAnimationBuilder<double>(
             duration: const Duration(milliseconds: 400),
             tween: Tween<double>(begin: 0, end: totalPaid),
-            builder: (context, value, child) => Text('Total Paid: ${value.toStringAsFixed(2)}'),
+            builder: (context, value, child) => Text('Total Paid: '),
           ),
           const SizedBox(height: 4),
           TweenAnimationBuilder<double>(
             duration: const Duration(milliseconds: 400),
             tween: Tween<double>(begin: 0, end: due),
             builder: (context, value, child) => Text(
-              'Due: ${value.toStringAsFixed(2)}',
+              'Due: ',
               style: TextStyle(
                 color: due > 0 ? AppTheme.errorColor : Colors.green,
                 fontWeight: FontWeight.w700,
@@ -165,7 +176,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment recorded')));
                         }
                       } else if (paymentProvider.error != null && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${paymentProvider.error}')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ')));
                       }
                     },
               child: Text(paymentProvider.isLoading ? 'Saving...' : 'Add'),
@@ -185,11 +196,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Card(
       child: ListTile(
         leading: const Icon(Icons.receipt_long),
-        title: Text('${p.amount.toStringAsFixed(2)} • ${p.method ?? 'N/A'}'),
+        title: Text(' • '),
         subtitle: Text(p.paidAt),
       ),
     );
   }
 }
-
-
