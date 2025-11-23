@@ -1,13 +1,13 @@
-# GymBook - Gym Management App
+# GymEdge - Gym Management System
 
-A comprehensive cross-platform gym management application built with Flutter and FastAPI. This app helps gym owners manage members, plans, staff, and leads efficiently.
+A comprehensive gym management system with a React frontend and FastAPI backend. This system helps gym owners manage members, plans, staff, payments, and leads efficiently.
 
 ## Features
 
 ### 🏠 Dashboard
 - Real-time gym statistics
-- Overview of total, active, expiring, and expired members
-- Quick action buttons for common tasks
+- Overview of total members, plans, staff, and active sessions
+- Quick navigation to all sections
 
 ### 👥 Members Management
 - Add, edit, and delete gym members
@@ -25,6 +25,11 @@ A comprehensive cross-platform gym management application built with Flutter and
 - Track staff roles and contact information
 - Add, edit, and remove staff
 
+### 💰 Payments Management
+- Record member payments
+- Track payment history
+- View payment statistics
+
 ### 📞 Leads Management
 - Track potential customers
 - Add contact information and notes
@@ -33,10 +38,10 @@ A comprehensive cross-platform gym management application built with Flutter and
 ## Tech Stack
 
 ### Frontend
-- **Flutter** - Cross-platform mobile app development
-- **Provider** - State management
-- **HTTP** - API communication
-- **Shared Preferences** - Local data storage
+- **React.js** - JavaScript library for building user interfaces
+- **HTML5/CSS3** - Markup and styling
+- **Bootstrap** - Responsive design framework
+- **Vanilla JavaScript** - Client-side scripting
 
 ### Backend
 - **FastAPI** - Python web framework
@@ -45,11 +50,10 @@ A comprehensive cross-platform gym management application built with Flutter and
 
 ## Prerequisites
 
-- Flutter SDK (3.0.0 or higher)
-- Dart SDK
 - Python 3.8+
 - PostgreSQL database
-- Android Studio / VS Code
+- Node.js (for development server)
+- Modern web browser
 
 ## Installation
 
@@ -57,36 +61,36 @@ A comprehensive cross-platform gym management application built with Flutter and
 
 1. **Install Python dependencies:**
    ```bash
-   pip install fastapi uvicorn psycopg2-binary pydantic
+   pip install -r requirements.txt
    ```
 
 2. **Configure database:**
    - Create a PostgreSQL database named `gym`
    - Update database credentials in `config/database.py`
 
-3. **Run the FastAPI server:**
+3. **Initialize the database:**
    ```bash
-   cd backend
+   python config/database.py
+   ```
+
+4. **Run the FastAPI server:**
+   ```bash
    uvicorn index:app --reload --host 0.0.0.0 --port 8000
    ```
 
 ### 2. Frontend Setup
 
-1. **Install Flutter dependencies:**
+1. **Serve the frontend:**
+   - Use any static file server to serve files from the `web/` directory
+   - For development, you can use Python's built-in server:
    ```bash
-   flutter pub get
+   cd web
+   python -m http.server 3000
    ```
 
-2. **Configure API endpoint:**
-   - Update the `baseUrl` in `lib/services/api_service.dart`
-   - For Android emulator: `http://10.0.2.2:8000`
-   - For iOS simulator: `http://localhost:8000`
-   - For physical device: `http://your-ip:8000`
-
-3. **Run the Flutter app:**
-   ```bash
-   flutter run
-   ```
+2. **Access the application:**
+   - Backend API: `http://localhost:8000`
+   - Frontend: `http://localhost:3000`
 
 ## Usage
 
@@ -96,29 +100,32 @@ A comprehensive cross-platform gym management application built with Flutter and
 
 ### Dashboard
 - View gym statistics at a glance
-- Click on stat cards to see detailed information
-- Use quick action buttons for common tasks
+- Navigate to different sections using the top navigation bar
 
 ### Managing Members
-1. Navigate to the Members tab
-2. Use the search bar to find specific members
-3. Use filter chips to view members by status
-4. Tap the + button to add new members
-5. Use the menu on member cards to edit or delete
+1. Navigate to the Members section
+2. Use the form to add new members
+3. View all members in the table
+4. Edit or delete members using the action buttons
 
 ### Managing Plans
-1. Go to the Plans tab
-2. Tap + to create new plans
+1. Go to the Plans section
+2. Use the form to create new plans
 3. Set plan name, duration, and price
-4. Use the menu to edit or delete plans
+4. Edit or delete plans using the action buttons
 
 ### Managing Staff
-1. Navigate to the Staff tab
+1. Navigate to the Staff section
 2. Add new staff members with their details
 3. Edit or remove staff as needed
 
+### Recording Payments
+1. Go to the Payments section
+2. Record new payments with member details
+3. View payment history in the table
+
 ### Managing Leads
-1. Go to the Leads tab
+1. Navigate to the Leads section
 2. Add potential customers
 3. Track their information and notes
 4. Convert leads to members when ready
@@ -126,36 +133,32 @@ A comprehensive cross-platform gym management application built with Flutter and
 ## Project Structure
 
 ```
-lib/
-├── main.dart                 # App entry point
-├── models/                   # Data models
-│   ├── client.dart
-│   ├── plan.dart
-│   ├── staff.dart
-│   └── lead.dart
-├── providers/                # State management
-│   ├── auth_provider.dart
-│   └── gym_provider.dart
-├── screens/                  # UI screens
-│   ├── splash_screen.dart
-│   ├── login_screen.dart
-│   ├── main_screen.dart
-│   ├── dashboard_screen.dart
-│   ├── members_screen.dart
-│   ├── add_member_screen.dart
-│   ├── plans_screen.dart
-│   ├── staff_screen.dart
-│   └── leads_screen.dart
-├── services/                 # API services
-│   └── api_service.dart
-├── utils/                    # Utilities
-│   └── theme.dart
-└── widgets/                  # Reusable widgets
-    ├── stat_card.dart
-    └── member_card.dart
+.
+├── config/
+│   └── database.py           # Database configuration
+├── routes/                   # API route handlers
+│   ├── clients.py
+│   ├── dashboard.py
+│   ├── leads.py
+│   ├── payments.py
+│   ├── plans.py
+│   └── staffs.py
+├── web/                      # React frontend
+│   ├── index.html            # Main HTML file
+│   ├── styles/               # CSS stylesheets
+│   ├── scripts/              # JavaScript files
+│   └── components/           # React components
+├── index.py                  # FastAPI application entry point
+├── requirements.txt          # Python dependencies
+└── README.md                 # This file
 ```
 
 ## API Endpoints
+
+### Authentication
+- `POST /register/` - Register new user
+- `POST /login/` - User login
+- `GET /me/` - Get current user info
 
 ### Dashboard
 - `GET /dashboard/stats` - Get gym statistics
@@ -179,6 +182,12 @@ lib/
 - `PUT /staffs/{id}` - Update staff
 - `DELETE /staffs/{id}` - Delete staff
 
+### Payments
+- `GET /payments/` - Get all payments
+- `POST /payments/` - Record new payment
+- `PUT /payments/{id}` - Update payment
+- `DELETE /payments/{id}` - Delete payment
+
 ### Leads
 - `GET /leads/` - Get all leads
 - `POST /leads/` - Create new lead
@@ -186,12 +195,12 @@ lib/
 
 ## Customization
 
-### Theme
-- Modify colors and styles in `lib/utils/theme.dart`
-- Update the `AppTheme` class to match your brand
+### Styling
+- Modify colors and styles in `web/styles/main.css`
+- Update the CSS classes to match your brand
 
 ### API Configuration
-- Update the base URL in `lib/services/api_service.dart`
+- Update the base URL in JavaScript fetch calls
 - Modify API endpoints as needed
 
 ### Database
@@ -212,10 +221,10 @@ lib/
    - Verify database credentials
    - Ensure database exists
 
-3. **Flutter Build Issues:**
-   - Run `flutter clean` and `flutter pub get`
-   - Check Flutter and Dart versions
-   - Update dependencies if needed
+3. **Frontend Not Loading:**
+   - Ensure all files are in the correct directories
+   - Check browser console for errors
+   - Verify static file server is running
 
 ## Contributing
 
@@ -235,6 +244,4 @@ For support and questions, please open an issue on GitHub or contact the develop
 
 ---
 
-**GymBook** - Manage your gym like a pro! 💪
-
-
+**GymEdge** - Manage your gym like a pro! 💪

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>API Test</h1>
+    <button id="testClients">Test Clients API</button>
+    <button id="testPlans">Test Plans API</button>
+    <div id="result"></div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+
+        $('#testClients').click(function() {
+            $.get(`${API_BASE_URL}/clients/`)
+                .done(function(data) {
+                    $('#result').html(`<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                })
+                .fail(function(xhr, status, error) {
+                    $('#result').html(`<p>Error: ${error}</p><p>Status: ${xhr.status}</p>`);
+                });
+        });
+
+        $('#testPlans').click(function() {
+            $.get(`${API_BASE_URL}/plans/`)
+                .done(function(data) {
+                    $('#result').html(`<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                })
+                .fail(function(xhr, status, error) {
+                    $('#result').html(`<p>Error: ${error}</p><p>Status: ${xhr.status}</p>`);
+                });
+        });
+    </script>
+</body>
+</html>

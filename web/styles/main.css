@@ -1,0 +1,123 @@
+/* Main CSS file for Gym Management System */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+}
+
+.navbar {
+    background-color: #007bff;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.navbar-brand, .nav-link {
+    color: white !important;
+}
+
+.nav-link:hover {
+    color: #e0e0e0 !important;
+}
+
+.card {
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,.1);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background-color: #0069d9;
+    border-color: #0062cc;
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: 10px;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 1.5rem;
+    border-radius: 10px;
+    color: white;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 8px rgba(0,0,0,.1);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0,0,0,.15);
+}
+
+.stat-card.blue {
+    background-color: #007bff;
+}
+
+.stat-card.green {
+    background-color: #28a745;
+}
+
+.stat-card.orange {
+    background-color: #fd7e14;
+}
+
+.stat-card.red {
+    background-color: #dc3545;
+}
+
+.stat-card h3 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card p {
+    font-size: 1.1rem;
+    margin-bottom: 0;
+    font-weight: 500;
+}
+
+.form-container {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,.1);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.table-container {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,.1);
+    padding: 1.5rem;
+    overflow-x: auto;
+}
+
+.footer {
+    background-color: #343a40;
+    color: white;
+    padding: 1rem 0;
+    margin-top: 2rem;
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.login-card {
+    max-width: 400px;
+    margin: 2rem auto;
+}

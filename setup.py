@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Setup script for GymBook - Gym Management App
-This script helps set up the initial configuration for the app.
+Setup script for GymEdge - Gym Management System
+This script helps set up the initial configuration for the system.
 """
 
 import os
@@ -20,50 +20,13 @@ def run_command(command, description):
         print(f"Error output: {e.stderr}")
         return False
 
-def check_flutter():
-    """Check if Flutter is installed."""
-    print("🔍 Checking Flutter installation...")
-    try:
-        result = subprocess.run(['flutter', '--version'], capture_output=True, text=True)
-        if result.returncode == 0:
-            print("✅ Flutter is installed")
-            return True
-        else:
-            print("❌ Flutter is not installed or not in PATH")
-            return False
-    except FileNotFoundError:
-        print("❌ Flutter is not installed or not in PATH")
-        return False
-
-def setup_flutter():
-    """Set up Flutter dependencies."""
-    print("\n📱 Setting up Flutter project...")
-    
-    # Get Flutter dependencies
-    if not run_command("flutter pub get", "Getting Flutter dependencies"):
-        return False
-    
-    # Check for any issues
-    if not run_command("flutter doctor", "Running Flutter doctor"):
-        return False
-    
-    return True
-
 def setup_python():
     """Set up Python dependencies."""
     print("\n🐍 Setting up Python dependencies...")
     
     # Install required packages
-    packages = [
-        "fastapi",
-        "uvicorn[standard]",
-        "psycopg2-binary",
-        "pydantic"
-    ]
-    
-    for package in packages:
-        if not run_command(f"pip install {package}", f"Installing {package}"):
-            return False
+    if not run_command("pip install -r requirements.txt", "Installing Python dependencies from requirements.txt"):
+        return False
     
     return True
 
@@ -71,7 +34,7 @@ def create_env_file():
     """Create environment configuration file."""
     print("\n⚙️ Creating environment configuration...")
     
-    env_content = """# GymBook Environment Configuration
+    env_content = """# GymEdge Environment Configuration
 
 # Database Configuration
 DB_NAME=gym
@@ -84,8 +47,8 @@ DB_PORT=5432
 API_HOST=0.0.0.0
 API_PORT=8000
 
-# Flutter Configuration
-FLUTTER_API_URL=http://10.0.2.2:8000
+# Frontend Configuration
+FRONTEND_PORT=3000
 """
     
     try:
@@ -99,19 +62,8 @@ FLUTTER_API_URL=http://10.0.2.2:8000
 
 def main():
     """Main setup function."""
-    print("🚀 Welcome to GymBook Setup!")
+    print("🚀 Welcome to GymEdge Setup!")
     print("=" * 50)
-    
-    # Check Flutter
-    if not check_flutter():
-        print("\n❌ Please install Flutter first:")
-        print("   Visit: https://flutter.dev/docs/get-started/install")
-        sys.exit(1)
-    
-    # Setup Flutter
-    if not setup_flutter():
-        print("\n❌ Flutter setup failed")
-        sys.exit(1)
     
     # Setup Python
     if not setup_python():
@@ -128,11 +80,9 @@ def main():
     print("\n📋 Next steps:")
     print("1. Start your PostgreSQL database")
     print("2. Run the FastAPI server: uvicorn index:app --reload --host 0.0.0.0 --port 8000")
-    print("3. Run the Flutter app: flutter run")
+    print("3. Serve the frontend from the web/ directory")
     print("\n📖 For more information, see README.md")
     print("=" * 50)
 
 if __name__ == "__main__":
     main()
-
-
