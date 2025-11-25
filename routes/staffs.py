@@ -21,8 +21,8 @@ def create_staffs(staffs: StaffModel):
             (staffs.staffname, staffs.email, staffs.phonenumber, staffs.role),
         )
         database.conn.commit()
-        plan_id = database.cur.fetchone()[0]
-        return {"id": plan_id, "message": "staffs added successfully"}
+        staff_id = database.cur.fetchone()[0]
+        return {"id": staff_id, "message": "staffs added successfully"}
     except Exception as e:
         database.conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -38,7 +38,7 @@ def get_staffs():
             "id": row[0],
             "staffname": row[1],
             "email": row[2],
-            "phonenumber": str(row[3]),
+            "phonenumber": int(row[3]),
             "role": row[4],
         })
     return {"staffs": staffs}

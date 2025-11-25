@@ -9,7 +9,7 @@ router = APIRouter()
 
 class ClientModel(BaseModel):
     clientname: str
-    phonenumber: str
+    phonenumber: int
     dateofbirth: str
     gender: str
     bloodgroup: str
@@ -89,6 +89,42 @@ def get_clients():
     return {"clients": clients}
 
 
+@router.get("/clients/birthdays/today")
+def get_birthday_clients():
+    database.cur.execute("""
+        SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+               c.address, c.notes, c.email, c.height, c.weight,
+               c.start_date, c.end_date,
+               p.planname, p.days, p.amount
+        FROM clients c
+        JOIN plans p ON c.plan_id = p.id
+        WHERE EXTRACT(MONTH FROM c.dateofbirth::date) = EXTRACT(MONTH FROM CURRENT_DATE)
+          AND EXTRACT(DAY FROM c.dateofbirth::date) = EXTRACT(DAY FROM CURRENT_DATE)
+    """)
+    rows = database.cur.fetchall()
+    clients = []
+    for row in rows:
+        clients.append({
+            "id": row[0],
+            "clientname": row[1],
+            "phonenumber": str(row[2]),
+            "dateofbirth": str(row[3]),
+            "gender": row[4],
+            "bloodgroup": row[5],
+            "address": row[6],
+            "notes": row[7],
+            "email": row[8],
+            "height": float(row[9]),
+            "weight": float(row[10]),
+            "start_date": str(row[11]),
+            "end_date": str(row[12]) if row[12] else None,
+            "planname": row[13],
+            "days": row[14],
+            "amount": float(row[15]) if row[15] else None,
+        })
+    return {"clients": clients}
+
+
 @router.get("/clients/{client_id}")
 def get_client(client_id: int):
     database.cur.execute("SELECT id,clientname,phonenumber,dateofbirth,gender,bloodgroup,address,notes,email,height,weight FROM clients WHERE id = %s", (client_id,))
@@ -98,7 +134,7 @@ def get_client(client_id: int):
     client = {
         "id": row[0],
         "clientname": row[1],
-        "phonenumber": str(row[2]),
+        "phonenumber": int(row[2]),
         "dateofbirth": str(row[3]),
         "gender": row[4],
         "bloodgroup": row[5],

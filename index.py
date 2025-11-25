@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from config import database  # Import database connection
 from datetime import datetime, timedelta
@@ -12,6 +14,10 @@ from routes import clients, plans, staffs, leads, dashboard, payments
 
 
 app = FastAPI()
+
+# Serve static files
+app.mount("/styles", StaticFiles(directory="web/styles"), name="styles")
+app.mount("/scripts", StaticFiles(directory="web/scripts"), name="scripts")
 
 # Add CORS middleware
 app.add_middleware(
@@ -205,3 +211,9 @@ def get_current_user_info(current_user_id: int = Depends(get_current_user)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get user info: {str(e)}")
+
+
+# Serve the main index.html file
+@app.get("/")
+async def read_index():
+    return FileResponse('web/index.html')

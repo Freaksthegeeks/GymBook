@@ -2,7 +2,7 @@
 
 const { useState, useEffect } = React;
 
-// API base URL - assuming backend runs on port 8000
+// API base URL - assuming backend runs on port 8001
 const API_BASE_URL = 'http://localhost:8001';
 
 // Utility function for API calls
@@ -21,7 +21,9 @@ const apiCall = async (endpoint, options = {}) => {
             headers['Authorization'] = `Bearer ${token}`;
         }
         
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        // Add timestamp to bust cache
+        const cacheBuster = endpoint.includes('?') ? `&_t=${Date.now()}` : `?_t=${Date.now()}`;
+        const response = await fetch(`${API_BASE_URL}${endpoint}${cacheBuster}`, {
             headers,
             ...options
         });
@@ -237,13 +239,19 @@ function App() {
     const [currentPage, setCurrentPage] = useState('dashboard');
     const [clients, setClients] = useState([]);
     const [plans, setPlans] = useState([]);
+        const [filteredClients, setFilteredClients] = useState([]);
+        const [filterStatus, setFilterStatus] = useState('all');
     const [staffs, setStaffs] = useState([]);
+    const [leads, setLeads] = useState([]);
     const [dashboardStats, setDashboardStats] = useState({
         total_members: 0,
         active_members: 0,
         expiring_in_10_days: 0,
-        expired_in_last_30_days: 0
+        expired_in_last_30_days: 0,
+        birthdays_today: 0,
+        total_leads: 0
     });
+    const [birthdayClients, setBirthdayClients] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -271,14 +279,44 @@ function App() {
             const clientsData = await apiCall('/clients/');
             const plansData = await apiCall('/plans/');
             const staffsData = await apiCall('/staffs/');
+            const leadsData = await apiCall('/leads/');
             const dashboardData = await apiCall('/dashboard/stats');
+            const birthdayData = await apiCall('/clients/birthdays/today');
             
             setClients(clientsData.clients || []);
             setPlans(plansData.plans || []);
             setStaffs(staffsData.staffs || []);
+            setLeads(leadsData.leads || []);
             setDashboardStats(dashboardData);
+            setBirthdayClients(birthdayData.clients || []);
         } catch (err) {
             setError('Failed to fetch data: ' + err.message);
+            console.error('Fetch error:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Fetch filtered clients
+    const fetchFilteredClients = async (status) => {
+        setLoading(true);
+        setError(null);
+        try {
+            let clientsData;
+            if (status === 'all') {
+                clientsData = await apiCall('/clients/');
+            } else {
+                clientsData = await apiCall(`/clients/filter/?status=${status}`);
+            }
+            
+            if (status === 'all') {
+                setFilteredClients(clientsData.clients || []);
+            } else {
+                setFilteredClients(clientsData.clients || []);
+            }
+            setFilterStatus(status);
+        } catch (err) {
+            setError('Failed to fetch filtered data: ' + err.message);
             console.error('Fetch error:', err);
         } finally {
             setLoading(false);
@@ -317,6 +355,19 @@ function App() {
         }
     };
 
+    // Navigation handler for filtered client views
+    const handleFilteredNavigation = (page, status) => {
+        setCurrentPage(page);
+        if (isLoggedIn) {
+            fetchFilteredClients(status);
+        }
+    };
+
+    // Update global reference to handleFilteredNavigation
+    useEffect(() => {
+        window.handleFilteredNavigation = handleFilteredNavigation;
+    }, [isLoggedIn]);
+
     // If not logged in, show login page
     if (!isLoggedIn) {
         return <Login onLogin={handleLogin} />;
@@ -331,24 +382,30 @@ function App() {
                     clients={clients} 
                     plans={plans} 
                     staffs={staffs} 
+                    leads={leads}
+                    birthdayClients={birthdayClients}
                     loading={loading} 
                     error={error} 
                     onNavigate={handleNavigation}
                 />;
             case 'clients':
-                return <Clients clients={clients} plans={plans} onRefresh={fetchData} loading={loading} error={error} />;
+                return <Clients clients={filterStatus === 'all' ? clients : filteredClients} plans={plans} onRefresh={fetchData} loading={loading} error={error} filterStatus={filterStatus} onFilterChange={fetchFilteredClients} />;
             case 'plans':
                 return <Plans plans={plans} onRefresh={fetchData} loading={loading} error={error} />;
             case 'staff':
                 return <Staff staffs={staffs} onRefresh={fetchData} loading={loading} error={error} />;
             case 'payments':
                 return <Payments onRefresh={fetchData} loading={loading} error={error} />;
+            case 'leads':
+                return <Leads leads={leads} onRefresh={fetchData} loading={loading} error={error} />;
             default:
                 return <Dashboard 
                     stats={dashboardStats} 
                     clients={clients} 
                     plans={plans} 
                     staffs={staffs} 
+                    leads={leads}
+                    birthdayClients={birthdayClients}
                     loading={loading} 
                     error={error} 
                     onNavigate={handleNavigation}
@@ -395,6 +452,9 @@ function Navbar({ onNavigate, onLogout, currentUser }) {
                         <li className="nav-item">
                             <button className="nav-link btn" onClick={() => onNavigate('payments')}>Payments</button>
                         </li>
+                        <li className="nav-item">
+                            <button className="nav-link btn" onClick={() => onNavigate('leads')}>Leads</button>
+                        </li>
                     </ul>
                     <ul className="navbar-nav">
                         <li className="nav-item me-3">
@@ -413,7 +473,7 @@ function Navbar({ onNavigate, onLogout, currentUser }) {
 }
 
 // Dashboard component
-function Dashboard({ stats, clients, plans, staffs, loading, error, onNavigate }) {
+function Dashboard({ stats, clients, plans, staffs, birthdayClients, loading, error, onNavigate }) {
     if (loading) return <div>Loading dashboard...</div>;
     if (error) return <div className="alert alert-danger">Error: {error}</div>;
 
@@ -426,44 +486,64 @@ function Dashboard({ stats, clients, plans, staffs, loading, error, onNavigate }
             
             {/* Statistics Cards */}
             <div className="row mb-4">
-                <div className="col-md-3 mb-4">
+                <div className="col-md-2 mb-4">
                     <div 
                         className="stat-card blue clickable" 
-                        onClick={() => onNavigate('clients')}
+                        onClick={() => window.handleFilteredNavigation('clients', 'all')}
                         style={{ cursor: 'pointer' }}
                     >
                         <h3>{stats.total_members}</h3>
                         <p>Total Members</p>
                     </div>
                 </div>
-                <div className="col-md-3 mb-4">
+                <div className="col-md-2 mb-4">
                     <div 
                         className="stat-card green clickable" 
-                        onClick={() => onNavigate('clients')}
+                        onClick={() => window.handleFilteredNavigation('clients', 'active')}
                         style={{ cursor: 'pointer' }}
                     >
                         <h3>{stats.active_members}</h3>
                         <p>Active Members</p>
                     </div>
                 </div>
-                <div className="col-md-3 mb-4">
+                <div className="col-md-2 mb-4">
                     <div 
                         className="stat-card orange clickable" 
-                        onClick={() => onNavigate('clients')}
+                        onClick={() => window.handleFilteredNavigation('clients', 'expiring')}
                         style={{ cursor: 'pointer' }}
                     >
                         <h3>{stats.expiring_in_10_days}</h3>
                         <p>Expiring in 10 Days</p>
                     </div>
                 </div>
-                <div className="col-md-3 mb-4">
+                <div className="col-md-2 mb-4">
                     <div 
                         className="stat-card red clickable" 
-                        onClick={() => onNavigate('clients')}
+                        onClick={() => window.handleFilteredNavigation('clients', 'expired')}
                         style={{ cursor: 'pointer' }}
                     >
                         <h3>{stats.expired_in_last_30_days}</h3>
                         <p>Expired in 30 Days</p>
+                    </div>
+                </div>
+                <div className="col-md-2 mb-4">
+                    <div 
+                        className="stat-card purple clickable" 
+                        onClick={() => onNavigate('leads')}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        <h3>{stats.total_leads}</h3>
+                        <p>Total Leads</p>
+                    </div>
+                </div>
+                <div className="col-md-2 mb-4">
+                    <div 
+                        className="stat-card yellow clickable" 
+                        onClick={() => window.handleFilteredNavigation('clients', 'all')}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        <h3>{stats.birthdays_today}</h3>
+                        <p>Birthdays Today</p>
                     </div>
                 </div>
             </div>
@@ -500,27 +580,31 @@ function Dashboard({ stats, clients, plans, staffs, loading, error, onNavigate }
                 <div className="col-md-6">
                     <div className="card">
                         <div className="card-header">
-                            <h5>Membership Plans</h5>
+                            <h5>Today's Birthdays</h5>
                         </div>
                         <div className="card-body">
-                            <table className="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Plan</th>
-                                        <th>Duration</th>
-                                        <th>Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {plans.slice(0, 5).map(plan => (
-                                        <tr key={plan.id}>
-                                            <td>{plan.planname}</td>
-                                            <td>{plan.days} days</td>
-                                            <td>${plan.amount}</td>
+                            {birthdayClients.length > 0 ? (
+                                <table className="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {birthdayClients.map(client => (
+                                            <tr key={client.id}>
+                                                <td>{client.clientname}</td>
+                                                <td>{client.email}</td>
+                                                <td>{client.phonenumber}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <p>No birthdays today.</p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -530,7 +614,7 @@ function Dashboard({ stats, clients, plans, staffs, loading, error, onNavigate }
 }
 
 // Clients component
-function Clients({ clients, plans, onRefresh, loading, error }) {
+function Clients({ clients, plans, onRefresh, loading, error, filterStatus, onFilterChange }) {
     const [clientForm, setClientForm] = useState({
         clientname: '',
         email: '',
@@ -558,11 +642,36 @@ function Clients({ clients, plans, onRefresh, loading, error }) {
         e.preventDefault();
         try {
             // Convert form data to correct types
+            const phoneNumber = parseInt(clientForm.phonenumber);
+            if (isNaN(phoneNumber)) {
+                alert('Please enter a valid phone number');
+                return;
+            }
+            
+            const height = parseFloat(clientForm.height);
+            if (isNaN(height)) {
+                alert('Please enter a valid height');
+                return;
+            }
+            
+            const weight = parseFloat(clientForm.weight);
+            if (isNaN(weight)) {
+                alert('Please enter a valid weight');
+                return;
+            }
+            
+            const planId = parseInt(clientForm.plan_id);
+            if (isNaN(planId)) {
+                alert('Please select a valid plan');
+                return;
+            }
+            
             const clientData = {
                 ...clientForm,
-                height: parseFloat(clientForm.height),
-                weight: parseFloat(clientForm.weight),
-                plan_id: parseInt(clientForm.plan_id)
+                phonenumber: phoneNumber,
+                height: height,
+                weight: weight,
+                plan_id: planId
             };
             
             await apiCall('/clients/', {
@@ -610,6 +719,60 @@ function Clients({ clients, plans, onRefresh, loading, error }) {
         } catch (err) {
             alert('Failed to delete client: ' + err.message);
         }
+    };
+
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Sort clients based on sortConfig
+    const sortedClients = React.useMemo(() => {
+        if (!clients) return [];
+        
+        let sortableClients = [...clients];
+        
+        // Apply search filter
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            sortableClients = sortableClients.filter(client => 
+                client.clientname.toLowerCase().includes(term) ||
+                client.email.toLowerCase().includes(term) ||
+                String(client.phonenumber).includes(term)
+            );
+        }
+        
+        // Apply sorting
+        if (sortConfig.key) {
+            sortableClients.sort((a, b) => {
+                if (a[sortConfig.key] < b[sortConfig.key]) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (a[sortConfig.key] > b[sortConfig.key]) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        
+        return sortableClients;
+    }, [clients, sortConfig, searchTerm]);
+
+    const requestSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (columnName) => {
+        if (sortConfig.key === columnName) {
+            return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+        }
+        return '';
+    };
+
+    const handleFilterClick = (status) => {
+        onFilterChange(status);
     };
 
     if (loading) return <div>Loading clients...</div>;
@@ -793,26 +956,82 @@ function Clients({ clients, plans, onRefresh, loading, error }) {
             </div>
             
             <div className="table-container">
-                <h4>All Clients</h4>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h4>
+                        {filterStatus === 'all' && 'All Clients'}
+                        {filterStatus === 'active' && 'Active Members'}
+                        {filterStatus === 'expiring' && 'Expiring in 10 Days'}
+                        {filterStatus === 'expired' && 'Expired in Last 30 Days'}
+                    </h4>
+                    <div>
+                        <button 
+                            className={`btn btn-sm me-1 ${filterStatus === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
+                            onClick={() => handleFilterClick('all')}
+                        >
+                            All
+                        </button>
+                        <button 
+                            className={`btn btn-sm me-1 ${filterStatus === 'active' ? 'btn-success' : 'btn-outline-success'}`}
+                            onClick={() => handleFilterClick('active')}
+                        >
+                            Active
+                        </button>
+                        <button 
+                            className={`btn btn-sm me-1 ${filterStatus === 'expiring' ? 'btn-warning' : 'btn-outline-warning'}`}
+                            onClick={() => handleFilterClick('expiring')}
+                        >
+                            Expiring
+                        </button>
+                        <button 
+                            className={`btn btn-sm ${filterStatus === 'expired' ? 'btn-danger' : 'btn-outline-danger'}`}
+                            onClick={() => handleFilterClick('expired')}
+                        >
+                            Expired
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="mb-3">
+                    <input 
+                        type="text" 
+                        className="form-control" 
+                        placeholder="Search clients..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                
                 <table className="table table-striped">
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Plan</th>
+                            <th onClick={() => requestSort('id')} style={{cursor: 'pointer'}}>
+                                ID{getSortIcon('id')}
+                            </th>
+                            <th onClick={() => requestSort('clientname')} style={{cursor: 'pointer'}}>
+                                Name{getSortIcon('clientname')}
+                            </th>
+                            <th onClick={() => requestSort('email')} style={{cursor: 'pointer'}}>
+                                Email{getSortIcon('email')}
+                            </th>
+                            <th onClick={() => requestSort('phonenumber')} style={{cursor: 'pointer'}}>
+                                Phone{getSortIcon('phonenumber')}
+                            </th>
+                            <th onClick={() => requestSort('planname')} style={{cursor: 'pointer'}}>
+                                Plan{getSortIcon('planname')}
+                            </th>
+                            <th>End Date</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {clients.map(client => (
+                        {sortedClients.map(client => (
                             <tr key={client.id}>
                                 <td>{client.id}</td>
                                 <td>{client.clientname}</td>
                                 <td>{client.email}</td>
                                 <td>{client.phonenumber}</td>
                                 <td>{client.planname}</td>
+                                <td>{client.end_date}</td>
                                 <td>
                                     <button className="btn btn-sm btn-outline-primary me-1">Edit</button>
                                     <button 
@@ -851,10 +1070,22 @@ function Plans({ plans, onRefresh, loading, error }) {
         e.preventDefault();
         try {
             // Convert form data to correct types
+            const days = parseInt(planForm.days);
+            if (isNaN(days)) {
+                alert('Please enter a valid number of days');
+                return;
+            }
+            
+            const amount = parseFloat(planForm.amount);
+            if (isNaN(amount)) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
             const planData = {
                 ...planForm,
-                days: parseInt(planForm.days),
-                amount: parseFloat(planForm.amount)
+                days: days,
+                amount: amount
             };
             
             await apiCall('/plans/', {
@@ -1005,9 +1236,15 @@ function Staff({ staffs, onRefresh, loading, error }) {
         e.preventDefault();
         try {
             // Convert form data to correct types
+            const phoneNumber = parseInt(staffForm.phonenumber);
+            if (isNaN(phoneNumber)) {
+                alert('Please enter a valid phone number');
+                return;
+            }
+            
             const staffData = {
                 ...staffForm,
-                phonenumber: parseInt(staffForm.phonenumber)
+                phonenumber: phoneNumber
             };
             
             await apiCall('/staffs/', {
@@ -1137,7 +1374,7 @@ function Staff({ staffs, onRefresh, loading, error }) {
                                 <td>{staff.id}</td>
                                 <td>{staff.staffname}</td>
                                 <td>{staff.email}</td>
-                                <td>{staff.phonenumber || 'N/A'}</td>
+                                <td>{staff.phonenumber}</td>
                                 <td>{staff.role}</td>
                                 <td>
                                     <button className="btn btn-sm btn-outline-primary me-1">Edit</button>
@@ -1179,10 +1416,22 @@ function Payments({ onRefresh, loading, error }) {
         e.preventDefault();
         try {
             // Convert form data to correct types
+            const clientId = parseInt(paymentForm.client_id);
+            if (isNaN(clientId)) {
+                alert('Please enter a valid client ID');
+                return;
+            }
+            
+            const amount = parseFloat(paymentForm.amount);
+            if (isNaN(amount)) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
             const paymentData = {
                 ...paymentForm,
-                client_id: parseInt(paymentForm.client_id),
-                amount: parseFloat(paymentForm.amount)
+                client_id: clientId,
+                amount: amount
             };
             
             await apiCall('/payments/', {
@@ -1309,6 +1558,155 @@ function Payments({ onRefresh, loading, error }) {
     );
 }
 
+// Leads component
+function Leads({ leads, onRefresh, loading, error }) {
+    const [leadForm, setLeadForm] = useState({
+        name: '',
+        phonenumber: '',
+        notes: ''
+    });
+
+    const handleLeadFormChange = (e) => {
+        const { name, value } = e.target;
+        setLeadForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleAddLead = async (e) => {
+        e.preventDefault();
+        try {
+            await apiCall('/leads/', {
+                method: 'POST',
+                body: JSON.stringify(leadForm)
+            });
+            
+            // Reset form
+            setLeadForm({
+                name: '',
+                phonenumber: '',
+                notes: ''
+            });
+            
+            // Refresh data
+            onRefresh();
+            
+            alert('Lead added successfully!');
+        } catch (err) {
+            alert('Failed to add lead: ' + err.message);
+        }
+    };
+
+    const handleDeleteLead = async (leadId) => {
+        if (!window.confirm('Are you sure you want to delete this lead?')) return;
+        
+        try {
+            await apiCall(`/leads/${leadId}`, {
+                method: 'DELETE'
+            });
+            
+            // Refresh data
+            onRefresh();
+            
+            alert('Lead deleted successfully!');
+        } catch (err) {
+            alert('Failed to delete lead: ' + err.message);
+        }
+    };
+
+    if (loading) return <div>Loading leads...</div>;
+    if (error) return <div className="alert alert-danger">Error: {error}</div>;
+
+    return (
+        <div>
+            <h2>Lead Management</h2>
+            <div className="form-container">
+                <h4>Add New Lead</h4>
+                <form onSubmit={handleAddLead}>
+                    <div className="row">
+                        <div className="col-md-4 mb-3">
+                            <label className="form-label">Name</label>
+                            <input 
+                                type="text" 
+                                className="form-control" 
+                                name="name"
+                                value={leadForm.name}
+                                onChange={handleLeadFormChange}
+                                placeholder="Enter name" 
+                                required
+                            />
+                        </div>
+                        <div className="col-md-4 mb-3">
+                            <label className="form-label">Phone Number</label>
+                            <input 
+                                type="tel" 
+                                className="form-control" 
+                                name="phonenumber"
+                                value={leadForm.phonenumber}
+                                onChange={handleLeadFormChange}
+                                placeholder="Enter phone number" 
+                                required
+                            />
+                        </div>
+                        <div className="col-md-4 mb-3">
+                            <label className="form-label">Notes</label>
+                            <input 
+                                type="text" 
+                                className="form-control" 
+                                name="notes"
+                                value={leadForm.notes}
+                                onChange={handleLeadFormChange}
+                                placeholder="Enter notes"
+                            />
+                        </div>
+                    </div>
+                    <button type="submit" className="btn btn-primary">Add Lead</button>
+                </form>
+            </div>
+            
+            <div className="table-container">
+                <h4>All Leads ({leads.length})</h4>
+                {leads.length > 0 ? (
+                    <table className="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Notes</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {leads.map(lead => (
+                                <tr key={lead.id}>
+                                    <td>{lead.id}</td>
+                                    <td>{lead.name}</td>
+                                    <td>{lead.phonenumber}</td>
+                                    <td>{lead.notes || '-'}</td>
+                                    <td>{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '-'}</td>
+                                    <td>
+                                        <button 
+                                            className="btn btn-sm btn-outline-danger"
+                                            onClick={() => handleDeleteLead(lead.id)}
+                                        >
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                ) : (
+                    <p>No leads found.</p>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // Footer component
 function Footer() {
     return (
@@ -1319,6 +1717,9 @@ function Footer() {
         </footer>
     );
 }
+
+// Expose functions to global scope for onclick handlers
+window.handleFilteredNavigation = null;
 
 // Render the app
 const root = ReactDOM.createRoot(document.getElementById('root'));
