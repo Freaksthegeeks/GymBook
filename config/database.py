@@ -29,9 +29,10 @@ cur.execute("""
     plan_id INT REFERENCES plans(id) ON DELETE SET NULL,
     start_date DATE,
     end_date DATE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    total_paid NUMERIC(10,2) DEFAULT 0,
+    balance_due NUMERIC(10,2) DEFAULT 0
 );
-
             CREATE TABLE IF NOT EXISTS plans (
         id SERIAL PRIMARY KEY,
         planname VARCHAR(50) UNIQUE NOT NULL,
@@ -47,7 +48,6 @@ cur.execute("""
         role VARCHAR(50) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP       
     );  
-
             CREATE TABLE IF NOT EXISTS leads (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100) NOT NULL,

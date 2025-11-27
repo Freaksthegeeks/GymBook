@@ -395,7 +395,7 @@ function App() {
             case 'staff':
                 return <Staff staffs={staffs} onRefresh={fetchData} loading={loading} error={error} />;
             case 'payments':
-                return <Payments onRefresh={fetchData} loading={loading} error={error} />;
+                return <Payments clients={clients} onRefresh={fetchData} loading={loading} error={error} />;
             case 'leads':
                 return <Leads leads={leads} onRefresh={fetchData} loading={loading} error={error} />;
             default:
@@ -1395,7 +1395,7 @@ function Staff({ staffs, onRefresh, loading, error }) {
 }
 
 // Payments component
-function Payments({ onRefresh, loading, error }) {
+function Payments({ clients, onRefresh, loading, error }) {
     const [paymentForm, setPaymentForm] = useState({
         client_id: '',
         amount: '',
@@ -1403,6 +1403,10 @@ function Payments({ onRefresh, loading, error }) {
         note: '',
         method: 'Cash'
     });
+    
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [selectedClientId, setSelectedClientId] = useState('');
+    const [recentPayments, setRecentPayments] = useState([]);
 
     const handlePaymentFormChange = (e) => {
         const { name, value } = e.target;
@@ -1411,6 +1415,44 @@ function Payments({ onRefresh, loading, error }) {
             [name]: value
         }));
     };
+    
+    const handleClientSelect = (clientId) => {
+        // Convert clientId to string for comparison since it might come as a number
+        const clientIdStr = clientId.toString();
+        console.log('Client selected:', clientIdStr);
+        setSelectedClientId(clientIdStr);
+        setPaymentForm(prev => ({
+            ...prev,
+            client_id: clientIdStr
+        }));
+        
+        // Load payment history for selected client
+        if (clientIdStr) {
+            loadPaymentHistory(clientIdStr);
+        }
+    };
+
+    const loadPaymentHistory = async (clientId) => {
+        console.log('Loading payment history for client:', clientId);
+        try {
+            const response = await apiCall(`/payments/?client_id=${clientId}`);
+            console.log('Payment history response:', response);
+            setPaymentHistory(response.payments || []);
+        } catch (err) {
+            console.error('Failed to load payment history:', err);
+            setPaymentHistory([]);
+        }
+    };
+    
+    const loadRecentPayments = async () => {
+        try {
+            const response = await apiCall('/payments/');
+            setRecentPayments(response.payments.slice(0, 10) || []); // Get last 10 payments
+        } catch (err) {
+            console.error('Failed to load recent payments:', err);
+            setRecentPayments([]);
+        }
+    };
 
     const handleAddPayment = async (e) => {
         e.preventDefault();
@@ -1418,7 +1460,7 @@ function Payments({ onRefresh, loading, error }) {
             // Convert form data to correct types
             const clientId = parseInt(paymentForm.client_id);
             if (isNaN(clientId)) {
-                alert('Please enter a valid client ID');
+                alert('Please select a valid client');
                 return;
             }
             
@@ -1434,10 +1476,20 @@ function Payments({ onRefresh, loading, error }) {
                 amount: amount
             };
             
-            await apiCall('/payments/', {
+            const response = await apiCall('/payments/', {
                 method: 'POST',
                 body: JSON.stringify(paymentData)
             });
+            
+            // Show warning if overpayment
+            let message = 'Payment recorded successfully!';
+            if (response.overpayment) {
+                message += `\nWarning: Client has overpaid by $${Math.abs(response.balance_due).toFixed(2)}`;
+            } else if (response.balance_due <= 0) {
+                message += '\nClient payment is now complete!';
+            } else {
+                message += `\nBalance due: $${response.balance_due.toFixed(2)}`;
+            }
             
             // Reset form
             setPaymentForm({
@@ -1448,10 +1500,15 @@ function Payments({ onRefresh, loading, error }) {
                 method: 'Cash'
             });
             
+            // Clear selected client
+            setSelectedClientId('');
+            setPaymentHistory([]);
+            
             // Refresh data
             onRefresh();
+            loadRecentPayments(); // Refresh recent payments
             
-            alert('Payment recorded successfully!');
+            alert(message);
         } catch (err) {
             alert('Failed to record payment: ' + err.message);
         }
@@ -1461,16 +1518,42 @@ function Payments({ onRefresh, loading, error }) {
         if (!window.confirm('Are you sure you want to delete this payment?')) return;
         
         try {
-            // Note: The backend doesn't currently have a DELETE endpoint for payments
-            // This is just a placeholder for future implementation
-            alert('Payment deletion is not yet implemented in the backend API');
+            await apiCall(`/payments/${paymentId}`, {
+                method: 'DELETE'
+            });
+            
+            // Refresh data
+            onRefresh();
+            loadRecentPayments(); // Refresh recent payments
+            
+            // Reload payment history if a client is selected
+            if (selectedClientId) {
+                loadPaymentHistory(selectedClientId);
+            }
+            
+            alert('Payment deleted successfully!');
         } catch (err) {
             alert('Failed to delete payment: ' + err.message);
         }
     };
+    
+    // Load recent payments when component mounts
+    useEffect(() => {
+        loadRecentPayments();
+    }, []);
 
     if (loading) return <div>Loading payments...</div>;
     if (error) return <div className="alert alert-danger">Error: {error}</div>;
+
+    // Get client details for selected client
+    const selectedClient = clients && clients.find(client => client.id.toString() === selectedClientId) || null;
+    
+    // Get client name by ID for recent payments
+    const getClientName = (clientId) => {
+        if (!clients) return `Client ${clientId}`;
+        const client = clients.find(c => c.id.toString() === clientId.toString());
+        return client ? client.clientname : `Client ${clientId}`;
+    };
 
     return (
         <div>
@@ -1480,16 +1563,21 @@ function Payments({ onRefresh, loading, error }) {
                 <form onSubmit={handleAddPayment}>
                     <div className="row">
                         <div className="col-md-6 mb-3">
-                            <label className="form-label">Client ID</label>
-                            <input 
-                                type="number" 
-                                className="form-control" 
+                            <label className="form-label">Select Client</label>
+                            <select 
+                                className="form-select" 
                                 name="client_id"
                                 value={paymentForm.client_id}
-                                onChange={handlePaymentFormChange}
-                                placeholder="Enter client ID" 
+                                onChange={(e) => handleClientSelect(e.target.value)}
                                 required
-                            />
+                            >
+                                <option value="">Select a client</option>
+                                {clients && clients.map(client => (
+                                    <option key={client.id} value={client.id}>
+                                        {client.clientname} (ID: {client.id}) - ${client.amount} plan
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <div className="col-md-6 mb-3">
                             <label className="form-label">Amount ($)</label>
@@ -1505,6 +1593,47 @@ function Payments({ onRefresh, loading, error }) {
                             />
                         </div>
                     </div>
+                    {selectedClient && (
+                        <div className="row mb-3">
+                            <div className="col-md-12">
+                                <div className="alert alert-info">
+                                    <div className="row">
+                                        <div className="col-md-6">
+                                            <strong>Client:</strong> {selectedClient.clientname} (ID: {selectedClient.id})<br/>
+                                            <strong>Plan:</strong> {selectedClient.planname} (${selectedClient.amount})<br/>
+                                        </div>
+                                        <div className="col-md-6">
+                                            <strong>Total Paid:</strong> ${selectedClient.total_paid.toFixed(2)}<br/>
+                                            <strong>Balance Due:</strong> ${selectedClient.balance_due.toFixed(2)}
+                                            {selectedClient.balance_due < 0 && (
+                                                <span className="text-danger"> (Overpaid by ${Math.abs(selectedClient.balance_due).toFixed(2)})</span>
+                                            )}
+                                            {selectedClient.balance_due <= 0 && selectedClient.balance_due >= 0 && (
+                                                <span className="text-success"> (Payment Complete)</span>
+                                            )}
+                                            {selectedClient.balance_due > 0 && (
+                                                <span className="text-warning"> (Payment Pending)</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="row mt-2">
+                                        <div className="col-md-12">
+                                            <strong>Payment Status:</strong> 
+                                            {selectedClient.balance_due <= 0 ? (
+                                                selectedClient.balance_due < 0 ? (
+                                                    <span className="badge bg-danger ms-2">Overpaid</span>
+                                                ) : (
+                                                    <span className="badge bg-success ms-2">Paid</span>
+                                                )
+                                            ) : (
+                                                <span className="badge bg-warning ms-2">Pending (${selectedClient.balance_due.toFixed(2)} due)</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div className="row">
                         <div className="col-md-6 mb-3">
                             <label className="form-label">Payment Method</label>
@@ -1547,12 +1676,75 @@ function Payments({ onRefresh, loading, error }) {
                 </form>
             </div>
             
-            <div className="table-container">
-                <h4>Payment History</h4>
-                <div className="alert alert-info">
-                    Payment history display is not yet implemented. The backend API currently doesn't return payment details in a format that can be easily displayed.
+            {selectedClientId && (
+                <div className="table-container mt-4">
+                    <h4>Payment History for {selectedClient?.clientname || 'Selected Client'}</h4>
+                    {paymentHistory.length > 0 ? (
+                        <table className="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Note</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paymentHistory.map(payment => (
+                                    <tr key={payment.id}>
+                                        <td>{payment.id}</td>
+                                        <td>{new Date(payment.paid_at).toLocaleDateString()}</td>
+                                        <td>${payment.amount.toFixed(2)}</td>
+                                        <td>{payment.method}</td>
+                                        <td>{payment.note || '-'}</td>
+                                        <td>
+                                            <button 
+                                                className="btn btn-sm btn-outline-danger"
+                                                onClick={() => handleDeletePayment(payment.id)}
+                                            >
+                                                Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <p>No payment history found for this client.</p>
+                    )}
                 </div>
-                {/* This section would be implemented when the backend API is updated to return payment details */}
+            )}
+            
+            <div className="table-container mt-4">
+                <h4>Recent Payments</h4>
+                {recentPayments.length > 0 ? (
+                    <table className="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Client</th>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Method</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {recentPayments.map(payment => (
+                                <tr key={payment.id}>
+                                    <td>{payment.id}</td>
+                                    <td>{getClientName(payment.client_id)} (ID: {payment.client_id})</td>
+                                    <td>{new Date(payment.paid_at).toLocaleDateString()}</td>
+                                    <td>${payment.amount.toFixed(2)}</td>
+                                    <td>{payment.method}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                ) : (
+                    <p>No recent payments found.</p>
+                )}
             </div>
         </div>
     );
