@@ -38,3 +38,24 @@ def dashboard_stats():
         "birthdays_today": birthdays_today,
         "total_leads": total_leads
     }
+
+
+@router.get("/dashboard/due_members")
+def get_due_members():
+    """Get clients with pending payments (positive balance_due)"""
+    database.cur.execute("""
+        SELECT c.id, c.clientname, c.phonenumber, c.balance_due
+        FROM clients c
+        WHERE c.balance_due > 0
+        ORDER BY c.balance_due DESC
+    """)
+    rows = database.cur.fetchall()
+    due_members = []
+    for row in rows:
+        due_members.append({
+            "id": row[0],
+            "clientname": row[1],
+            "phonenumber": str(row[2]),
+            "balance_due": float(row[3]) if row[3] else 0.0
+        })
+    return {"due_members": due_members}

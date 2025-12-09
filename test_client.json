@@ -1,13 +1,13 @@
 {
-    "clientname": "Test Client",
-    "phonenumber": "1234567890",
-    "dateofbirth": "1990-01-01",
-    "gender": "Male",
-    "bloodgroup": "O+",
-    "address": "Test Address",
-    "email": "test@example.com",
-    "height": 175.5,
-    "weight": 70.2,
-    "plan_id": 24,
-    "start_date": "2025-11-19"
+  "clientname": "Test Client",
+  "phonenumber": 1234567890,
+  "dateofbirth": "1990-01-01",
+  "gender": "Male",
+  "bloodgroup": "O+",
+  "address": "Test Address",
+  "email": "test@example.com",
+  "height": 175.5,
+  "weight": 70.2,
+  "plan_id": 37,
+  "start_date": "2025-11-01"
 }

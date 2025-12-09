@@ -252,6 +252,7 @@ function App() {
         total_leads: 0
     });
     const [birthdayClients, setBirthdayClients] = useState([]);
+    const [dueMembers, setDueMembers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -282,6 +283,7 @@ function App() {
             const leadsData = await apiCall('/leads/');
             const dashboardData = await apiCall('/dashboard/stats');
             const birthdayData = await apiCall('/clients/birthdays/today');
+            const dueMembersData = await apiCall('/dashboard/due_members');
             
             setClients(clientsData.clients || []);
             setPlans(plansData.plans || []);
@@ -289,6 +291,7 @@ function App() {
             setLeads(leadsData.leads || []);
             setDashboardStats(dashboardData);
             setBirthdayClients(birthdayData.clients || []);
+            setDueMembers(dueMembersData.due_members || []);
         } catch (err) {
             setError('Failed to fetch data: ' + err.message);
             console.error('Fetch error:', err);
@@ -384,6 +387,7 @@ function App() {
                     staffs={staffs} 
                     leads={leads}
                     birthdayClients={birthdayClients}
+                    dueMembers={dueMembers}
                     loading={loading} 
                     error={error} 
                     onNavigate={handleNavigation}
@@ -398,6 +402,8 @@ function App() {
                 return <Payments clients={clients} onRefresh={fetchData} loading={loading} error={error} />;
             case 'leads':
                 return <Leads leads={leads} onRefresh={fetchData} loading={loading} error={error} />;
+            case 'reports':
+                return <Reports onRefresh={fetchData} loading={loading} error={error} />;
             default:
                 return <Dashboard 
                     stats={dashboardStats} 
@@ -406,6 +412,7 @@ function App() {
                     staffs={staffs} 
                     leads={leads}
                     birthdayClients={birthdayClients}
+                    dueMembers={dueMembers}
                     loading={loading} 
                     error={error} 
                     onNavigate={handleNavigation}
@@ -455,6 +462,9 @@ function Navbar({ onNavigate, onLogout, currentUser }) {
                         <li className="nav-item">
                             <button className="nav-link btn" onClick={() => onNavigate('leads')}>Leads</button>
                         </li>
+                        <li className="nav-item">
+                            <button className="nav-link btn" onClick={() => onNavigate('reports')}>Reports</button>
+                        </li>
                     </ul>
                     <ul className="navbar-nav">
                         <li className="nav-item me-3">
@@ -473,7 +483,7 @@ function Navbar({ onNavigate, onLogout, currentUser }) {
 }
 
 // Dashboard component
-function Dashboard({ stats, clients, plans, staffs, birthdayClients, loading, error, onNavigate }) {
+function Dashboard({ stats, clients, plans, staffs, birthdayClients, dueMembers, loading, error, onNavigate }) {
     if (loading) return <div>Loading dashboard...</div>;
     if (error) return <div className="alert alert-danger">Error: {error}</div>;
 
@@ -609,6 +619,43 @@ function Dashboard({ stats, clients, plans, staffs, birthdayClients, loading, er
                     </div>
                 </div>
             </div>
+            
+            {/* Due Members Section */}
+            <div className="row mt-4">
+                <div className="col-12">
+                    <div className="card">
+                        <div className="card-header">
+                            <h5>Members with Pending Payments</h5>
+                        </div>
+                        <div className="card-body">
+                            {dueMembers.length > 0 ? (
+                                <table className="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Client ID</th>
+                                            <th>Name</th>
+                                            <th>Phone Number</th>
+                                            <th>Balance Amount ($)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dueMembers.map(member => (
+                                            <tr key={member.id}>
+                                                <td>{member.id}</td>
+                                                <td>{member.clientname}</td>
+                                                <td>{member.phonenumber}</td>
+                                                <td>${member.balance_due.toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <p>All members are up to date with their payments.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
@@ -629,7 +676,75 @@ function Clients({ clients, plans, onRefresh, loading, error, filterStatus, onFi
         plan_id: '',
         start_date: new Date().toISOString().split('T')[0]
     });
+    
+    // State for renewal modal
+    const [showRenewalModal, setShowRenewalModal] = useState(false);
+    const [renewalClientId, setRenewalClientId] = useState(null);
+    const [renewalClientName, setRenewalClientName] = '';
 
+    // State for edit modal
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingClient, setEditingClient] = useState(null);
+    
+    // Helper function to check if a client is expired
+    const isClientExpired = (client) => {
+        if (!client.end_date) return false;
+        const endDate = new Date(client.end_date);
+        const today = new Date();
+        return endDate < today;
+    };
+
+    // Helper function to check if a client is active
+    const isClientActive = (client) => {
+        if (!client.end_date) return false;
+        const endDate = new Date(client.end_date);
+        const today = new Date();
+        return endDate >= today;
+    };
+    
+    // Handle edit client
+    const handleEditClient = (client) => {
+        setEditingClient(client);
+        setShowEditModal(true);
+    };
+    
+    // Handle edit submit
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const clientData = {
+            clientname: formData.get('clientname'),
+            email: formData.get('email'),
+            phonenumber: formData.get('phonenumber'),
+            dateofbirth: formData.get('dateofbirth'),
+            gender: formData.get('gender'),
+            bloodgroup: formData.get('bloodgroup'),
+            address: formData.get('address'),
+            notes: formData.get('notes'),
+            height: parseFloat(formData.get('height')),
+            weight: parseFloat(formData.get('weight'))
+            // Removed plan_id and start_date as they should not be editable
+        };
+        
+        try {
+            await apiCall(`/clients/${editingClient.id}`, {
+                method: 'PUT',
+                body: JSON.stringify(clientData)
+            });
+            
+            // Close modal
+            setShowEditModal(false);
+            setEditingClient(null);
+            
+            // Refresh data
+            onRefresh();
+            
+            alert('Client updated successfully!');
+        } catch (err) {
+            alert('Failed to update client: ' + err.message);
+        }
+    };
+    
     const handleClientFormChange = (e) => {
         const { name, value } = e.target;
         setClientForm(prev => ({
@@ -721,58 +836,40 @@ function Clients({ clients, plans, onRefresh, loading, error, filterStatus, onFi
         }
     };
 
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-    const [searchTerm, setSearchTerm] = useState('');
+    const handleRenewal = (clientId, clientName) => {
+        setShowRenewalModal(true);
+        setRenewalClientId(clientId);
+        setRenewalClientName(clientName);
+    };
 
-    // Sort clients based on sortConfig
-    const sortedClients = React.useMemo(() => {
-        if (!clients) return [];
-        
-        let sortableClients = [...clients];
-        
-        // Apply search filter
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            sortableClients = sortableClients.filter(client => 
-                client.clientname.toLowerCase().includes(term) ||
-                client.email.toLowerCase().includes(term) ||
-                String(client.phonenumber).includes(term)
-            );
+    const handleRenewalSubmit = async (e) => {
+        e.preventDefault();
+        const renewalDate = e.target.renewalDate.value;
+        const renewalPlanId = parseInt(e.target.renewalPlanId.value);
+        if (isNaN(renewalPlanId)) {
+            alert('Please select a valid plan');
+            return;
         }
         
-        // Apply sorting
-        if (sortConfig.key) {
-            sortableClients.sort((a, b) => {
-                if (a[sortConfig.key] < b[sortConfig.key]) {
-                    return sortConfig.direction === 'asc' ? -1 : 1;
-                }
-                if (a[sortConfig.key] > b[sortConfig.key]) {
-                    return sortConfig.direction === 'asc' ? 1 : -1;
-                }
-                return 0;
+        try {
+            await apiCall(`/clients/${renewalClientId}/renew`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    start_date: renewalDate,
+                    plan_id: renewalPlanId
+                })
             });
+            
+            // Close modal
+            setShowRenewalModal(false);
+            
+            // Refresh data
+            onRefresh();
+            
+            alert('Client renewed successfully!');
+        } catch (err) {
+            alert('Failed to renew client: ' + err.message);
         }
-        
-        return sortableClients;
-    }, [clients, sortConfig, searchTerm]);
-
-    const requestSort = (key) => {
-        let direction = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    const getSortIcon = (columnName) => {
-        if (sortConfig.key === columnName) {
-            return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
-        }
-        return '';
-    };
-
-    const handleFilterClick = (status) => {
-        onFilterChange(status);
     };
 
     if (loading) return <div>Loading clients...</div>;
@@ -780,271 +877,381 @@ function Clients({ clients, plans, onRefresh, loading, error, filterStatus, onFi
 
     return (
         <div>
-            <h2>Clients Management</h2>
-            <div className="form-container">
-                <h4>Add New Client</h4>
-                <form onSubmit={handleAddClient}>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Full Name</label>
-                            <input 
-                                type="text" 
-                                className="form-control" 
-                                name="clientname"
-                                value={clientForm.clientname}
-                                onChange={handleClientFormChange}
-                                placeholder="Enter full name" 
-                                required
-                            />
-                        </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Email</label>
-                            <input 
-                                type="email" 
-                                className="form-control" 
-                                name="email"
-                                value={clientForm.email}
-                                onChange={handleClientFormChange}
-                                placeholder="Enter email" 
-                                required
-                            />
-                        </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Phone Number</label>
-                            <input 
-                                type="tel" 
-                                className="form-control" 
-                                name="phonenumber"
-                                value={clientForm.phonenumber}
-                                onChange={handleClientFormChange}
-                                placeholder="Enter phone number" 
-                                required
-                            />
-                        </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Date of Birth</label>
-                            <input 
-                                type="date" 
-                                className="form-control" 
-                                name="dateofbirth"
-                                value={clientForm.dateofbirth}
-                                onChange={handleClientFormChange}
-                                required
-                            />
-                        </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Gender</label>
-                            <select 
-                                className="form-select" 
-                                name="gender"
-                                value={clientForm.gender}
-                                onChange={handleClientFormChange}
-                                required
-                            >
-                                <option value="">Select gender</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Blood Group</label>
-                            <select 
-                                className="form-select" 
-                                name="bloodgroup"
-                                value={clientForm.bloodgroup}
-                                onChange={handleClientFormChange}
-                                required
-                            >
-                                <option value="">Select blood group</option>
-                                <option value="A+">A+</option>
-                                <option value="A-">A-</option>
-                                <option value="B+">B+</option>
-                                <option value="B-">B-</option>
-                                <option value="AB+">AB+</option>
-                                <option value="AB-">AB-</option>
-                                <option value="O+">O+</option>
-                                <option value="O-">O-</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Height (cm)</label>
-                            <input 
-                                type="number" 
-                                className="form-control" 
-                                name="height"
-                                value={clientForm.height}
-                                onChange={handleClientFormChange}
-                                placeholder="Enter height" 
-                                required
-                            />
-                        </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Weight (kg)</label>
-                            <input 
-                                type="number" 
-                                className="form-control" 
-                                name="weight"
-                                value={clientForm.weight}
-                                onChange={handleClientFormChange}
-                                placeholder="Enter weight" 
-                                required
-                            />
-                        </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Address</label>
-                            <textarea 
-                                className="form-control" 
-                                name="address"
-                                value={clientForm.address}
-                                onChange={handleClientFormChange}
-                                placeholder="Enter address" 
-                                required
-                            />
-                        </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Notes</label>
-                            <textarea 
-                                className="form-control" 
-                                name="notes"
-                                value={clientForm.notes}
-                                onChange={handleClientFormChange}
-                                placeholder="Enter any notes"
-                            />
+            <h2>Clients</h2>
+            
+            {/* Edit Modal */}
+            {showEditModal && editingClient && (
+                <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog modal-lg">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Edit Client: {editingClient.clientname}</h5>
+                                <button type="button" className="btn-close" onClick={() => setShowEditModal(false)}></button>
+                            </div>
+                            <form onSubmit={handleEditSubmit}>
+                                <div className="modal-body">
+                                    <div className="row">
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Name</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="clientname"
+                                                defaultValue={editingClient.clientname}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Email</label>
+                                            <input
+                                                type="email"
+                                                className="form-control"
+                                                name="email"
+                                                defaultValue={editingClient.email}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="row">
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Phone Number</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="phonenumber"
+                                                defaultValue={editingClient.phonenumber}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Date of Birth</label>
+                                            <input
+                                                type="date"
+                                                className="form-control"
+                                                name="dateofbirth"
+                                                defaultValue={editingClient.dateofbirth}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="row">
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Gender</label>
+                                            <select
+                                                className="form-select"
+                                                name="gender"
+                                                defaultValue={editingClient.gender}
+                                                required
+                                            >
+                                                <option value="">Select</option>
+                                                <option value="male">Male</option>
+                                                <option value="female">Female</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Blood Group</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="bloodgroup"
+                                                defaultValue={editingClient.bloodgroup}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="row">
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Height (cm)</label>
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                name="height"
+                                                defaultValue={editingClient.height}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Weight (kg)</label>
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                name="weight"
+                                                defaultValue={editingClient.weight}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Address</label>
+                                        <textarea
+                                            className="form-control"
+                                            name="address"
+                                            defaultValue={editingClient.address}
+                                            rows="3"
+                                        ></textarea>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Notes</label>
+                                        <textarea
+                                            className="form-control"
+                                            name="notes"
+                                            defaultValue={editingClient.notes}
+                                            rows="3"
+                                        ></textarea>
+                                    </div>
+                                    <div className="alert alert-info">
+                                        <strong>Plan Information:</strong> Plan and start date cannot be edited. To change the plan, use the Renew button.
+                                        <br />
+                                        Current Plan: {editingClient.planname}
+                                        <br />
+                                        Start Date: {editingClient.start_date}
+                                        <br />
+                                        End Date: {editingClient.end_date}
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary">Save Changes</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Select Plan</label>
-                            <select 
-                                className="form-select" 
-                                name="plan_id"
-                                value={clientForm.plan_id}
-                                onChange={handleClientFormChange}
-                                required
-                            >
-                                <option value="">Select a plan</option>
-                                {plans.map(plan => (
-                                    <option key={plan.id} value={plan.id}>
-                                        {plan.planname} ({plan.days} days - ${plan.amount})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Start Date</label>
-                            <input 
-                                type="date" 
-                                className="form-control" 
-                                name="start_date"
-                                value={clientForm.start_date}
-                                onChange={handleClientFormChange}
-                                required
-                            />
+                </div>
+            )}
+            
+            {/* Renewal Modal */}
+            {showRenewalModal && (
+                <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Renew Subscription for {renewalClientName}</h5>
+                                <button type="button" className="btn-close" onClick={() => setShowRenewalModal(false)}></button>
+                            </div>
+                            <form onSubmit={handleRenewalSubmit}>
+                                <div className="modal-body">
+                                    <div className="mb-3">
+                                        <label className="form-label">New Plan</label>
+                                        <select className="form-select" name="renewalPlanId" required>
+                                            <option value="">Select a plan</option>
+                                            {plans.map(plan => (
+                                                <option key={plan.id} value={plan.id}>{plan.planname}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Start Date</label>
+                                        <input 
+                                            type="date" 
+                                            className="form-control" 
+                                            name="renewalDate" 
+                                            defaultValue={new Date().toISOString().split('T')[0]}
+                                            required 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowRenewalModal(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary">Renew Subscription</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                    <button type="submit" className="btn btn-primary">Add Client</button>
-                </form>
+                </div>
+            )}
+
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="card">
+                        <div className="card-header">
+                            <h5>Client List</h5>
+                        </div>
+                        <div className="card-body">
+                            <table className="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Plan</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {clients.map(client => (
+                                        <tr key={client.id}>
+                                            <td>{client.clientname}</td>
+                                            <td>{client.email}</td>
+                                            <td>{client.phonenumber}</td>
+                                            <td>{client.planname}</td>
+                                            <td>
+                                                {isClientActive(client) ? 'Active' : 'Expired'}
+                                            </td>
+                                            <td>
+                                                {isClientExpired(client) && (
+                                                    <button className="btn btn-sm btn-primary me-1" onClick={() => handleRenewal(client.id, client.clientname)}>Renew</button>
+                                                )}
+                                                <button className="btn btn-sm btn-warning me-1" onClick={() => handleEditClient(client)}>Edit</button>
+                                                <button className="btn btn-sm btn-danger" onClick={() => handleDeleteClient(client.id)}>Delete</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
             
-            <div className="table-container">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h4>
-                        {filterStatus === 'all' && 'All Clients'}
-                        {filterStatus === 'active' && 'Active Members'}
-                        {filterStatus === 'expiring' && 'Expiring in 10 Days'}
-                        {filterStatus === 'expired' && 'Expired in Last 30 Days'}
-                    </h4>
-                    <div>
-                        <button 
-                            className={`btn btn-sm me-1 ${filterStatus === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
-                            onClick={() => handleFilterClick('all')}
-                        >
-                            All
-                        </button>
-                        <button 
-                            className={`btn btn-sm me-1 ${filterStatus === 'active' ? 'btn-success' : 'btn-outline-success'}`}
-                            onClick={() => handleFilterClick('active')}
-                        >
-                            Active
-                        </button>
-                        <button 
-                            className={`btn btn-sm me-1 ${filterStatus === 'expiring' ? 'btn-warning' : 'btn-outline-warning'}`}
-                            onClick={() => handleFilterClick('expiring')}
-                        >
-                            Expiring
-                        </button>
-                        <button 
-                            className={`btn btn-sm ${filterStatus === 'expired' ? 'btn-danger' : 'btn-outline-danger'}`}
-                            onClick={() => handleFilterClick('expired')}
-                        >
-                            Expired
-                        </button>
+            <div className="row">
+                <div className="col-12">
+                    <div className="card">
+                        <div className="card-header">
+                            <h5>Add New Client</h5>
+                        </div>
+                        <div className="card-body">
+                            <form onSubmit={handleAddClient}>
+                                <div className="mb-3">
+                                    <label className="form-label">Name</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        name="clientname"
+                                        value={clientForm.clientname}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Email</label>
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        name="email"
+                                        value={clientForm.email}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Phone Number</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        name="phonenumber"
+                                        value={clientForm.phonenumber}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Date of Birth</label>
+                                    <input
+                                        type="date"
+                                        className="form-control"
+                                        name="dateofbirth"
+                                        value={clientForm.dateofbirth}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Gender</label>
+                                    <select
+                                        className="form-select"
+                                        name="gender"
+                                        value={clientForm.gender}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    >
+                                        <option value="">Select</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Blood Group</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        name="bloodgroup"
+                                        value={clientForm.bloodgroup}
+                                        onChange={handleClientFormChange}
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Address</label>
+                                    <textarea
+                                        className="form-control"
+                                        name="address"
+                                        value={clientForm.address}
+                                        onChange={handleClientFormChange}
+                                    ></textarea>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Notes</label>
+                                    <textarea
+                                        className="form-control"
+                                        name="notes"
+                                        value={clientForm.notes}
+                                        onChange={handleClientFormChange}
+                                    ></textarea>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Height (cm)</label>
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        name="height"
+                                        value={clientForm.height}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Weight (kg)</label>
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        name="weight"
+                                        value={clientForm.weight}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Plan</label>
+                                    <select
+                                        className="form-select"
+                                        name="plan_id"
+                                        value={clientForm.plan_id}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    >
+                                        <option value="">Select</option>
+                                        {plans.map(plan => (
+                                            <option key={plan.id} value={plan.id}>{plan.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label">Start Date</label>
+                                    <input
+                                        type="date"
+                                        className="form-control"
+                                        name="start_date"
+                                        value={clientForm.start_date}
+                                        onChange={handleClientFormChange}
+                                        required
+                                    />
+                                </div>
+                                <button type="submit" className="btn btn-primary">Add Client</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
-                
-                <div className="mb-3">
-                    <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="Search clients..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                
-                <table className="table table-striped">
-                    <thead>
-                        <tr>
-                            <th onClick={() => requestSort('id')} style={{cursor: 'pointer'}}>
-                                ID{getSortIcon('id')}
-                            </th>
-                            <th onClick={() => requestSort('clientname')} style={{cursor: 'pointer'}}>
-                                Name{getSortIcon('clientname')}
-                            </th>
-                            <th onClick={() => requestSort('email')} style={{cursor: 'pointer'}}>
-                                Email{getSortIcon('email')}
-                            </th>
-                            <th onClick={() => requestSort('phonenumber')} style={{cursor: 'pointer'}}>
-                                Phone{getSortIcon('phonenumber')}
-                            </th>
-                            <th onClick={() => requestSort('planname')} style={{cursor: 'pointer'}}>
-                                Plan{getSortIcon('planname')}
-                            </th>
-                            <th>End Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sortedClients.map(client => (
-                            <tr key={client.id}>
-                                <td>{client.id}</td>
-                                <td>{client.clientname}</td>
-                                <td>{client.email}</td>
-                                <td>{client.phonenumber}</td>
-                                <td>{client.planname}</td>
-                                <td>{client.end_date}</td>
-                                <td>
-                                    <button className="btn btn-sm btn-outline-primary me-1">Edit</button>
-                                    <button 
-                                        className="btn btn-sm btn-outline-danger"
-                                        onClick={() => handleDeleteClient(client.id)}
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
             </div>
         </div>
     );
@@ -1198,7 +1405,6 @@ function Plans({ plans, onRefresh, loading, error }) {
                                 <td>{plan.days} days</td>
                                 <td>${plan.amount}</td>
                                 <td>
-                                    <button className="btn btn-sm btn-outline-primary me-1">Edit</button>
                                     <button 
                                         className="btn btn-sm btn-outline-danger"
                                         onClick={() => handleDeletePlan(plan.id)}
@@ -1223,7 +1429,11 @@ function Staff({ staffs, onRefresh, loading, error }) {
         phonenumber: '',
         role: ''
     });
-
+    
+    // State for edit modal
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingStaff, setEditingStaff] = useState(null);
+    
     const handleStaffFormChange = (e) => {
         const { name, value } = e.target;
         setStaffForm(prev => ({
@@ -1231,7 +1441,43 @@ function Staff({ staffs, onRefresh, loading, error }) {
             [name]: value
         }));
     };
-
+    
+    // Handle edit staff
+    const handleEditStaff = (staff) => {
+        setEditingStaff(staff);
+        setShowEditModal(true);
+    };
+    
+    // Handle edit submit
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const staffData = {
+            staffname: formData.get('staffname'),
+            email: formData.get('email'),
+            phonenumber: parseInt(formData.get('phonenumber')),
+            role: formData.get('role')
+        };
+        
+        try {
+            await apiCall(`/staffs/${editingStaff.id}`, {
+                method: 'PUT',
+                body: JSON.stringify(staffData)
+            });
+            
+            // Close modal
+            setShowEditModal(false);
+            setEditingStaff(null);
+            
+            // Refresh data
+            onRefresh();
+            
+            alert('Staff member updated successfully!');
+        } catch (err) {
+            alert('Failed to update staff member: ' + err.message);
+        }
+    };
+    
     const handleAddStaff = async (e) => {
         e.preventDefault();
         try {
@@ -1263,9 +1509,9 @@ function Staff({ staffs, onRefresh, loading, error }) {
             // Refresh data
             onRefresh();
             
-            alert('Staff added successfully!');
+            alert('Staff member added successfully!');
         } catch (err) {
-            alert('Failed to add staff: ' + err.message);
+            alert('Failed to add staff member: ' + err.message);
         }
     };
 
@@ -1280,9 +1526,9 @@ function Staff({ staffs, onRefresh, loading, error }) {
             // Refresh data
             onRefresh();
             
-            alert('Staff deleted successfully!');
+            alert('Staff member deleted successfully!');
         } catch (err) {
-            alert('Failed to delete staff: ' + err.message);
+            alert('Failed to delete staff member: ' + err.message);
         }
     };
 
@@ -1292,11 +1538,78 @@ function Staff({ staffs, onRefresh, loading, error }) {
     return (
         <div>
             <h2>Staff Management</h2>
+            
+            {/* Edit Modal */}
+            {showEditModal && editingStaff && (
+                <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Edit Staff Member: {editingStaff.staffname}</h5>
+                                <button type="button" className="btn-close" onClick={() => setShowEditModal(false)}></button>
+                            </div>
+                            <form onSubmit={handleEditSubmit}>
+                                <div className="modal-body">
+                                    <div className="mb-3">
+                                        <label className="form-label">Full Name</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-control" 
+                                            name="staffname"
+                                            defaultValue={editingStaff.staffname}
+                                            placeholder="Enter full name" 
+                                            required
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Email</label>
+                                        <input 
+                                            type="email" 
+                                            className="form-control" 
+                                            name="email"
+                                            defaultValue={editingStaff.email}
+                                            placeholder="Enter email" 
+                                            required
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Phone Number</label>
+                                        <input 
+                                            type="tel" 
+                                            className="form-control" 
+                                            name="phonenumber"
+                                            defaultValue={editingStaff.phonenumber}
+                                            placeholder="Enter phone number" 
+                                            required
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Role</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-control" 
+                                            name="role"
+                                            defaultValue={editingStaff.role}
+                                            placeholder="Enter role" 
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             <div className="form-container">
-                <h4>Add New Staff</h4>
+                <h4>Add New Staff Member</h4>
                 <form onSubmit={handleAddStaff}>
                     <div className="row">
-                        <div className="col-md-6 mb-3">
+                        <div className="col-md-3 mb-3">
                             <label className="form-label">Full Name</label>
                             <input 
                                 type="text" 
@@ -1308,7 +1621,7 @@ function Staff({ staffs, onRefresh, loading, error }) {
                                 required
                             />
                         </div>
-                        <div className="col-md-6 mb-3">
+                        <div className="col-md-3 mb-3">
                             <label className="form-label">Email</label>
                             <input 
                                 type="email" 
@@ -1320,9 +1633,7 @@ function Staff({ staffs, onRefresh, loading, error }) {
                                 required
                             />
                         </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
+                        <div className="col-md-3 mb-3">
                             <label className="form-label">Phone Number</label>
                             <input 
                                 type="tel" 
@@ -1334,35 +1645,31 @@ function Staff({ staffs, onRefresh, loading, error }) {
                                 required
                             />
                         </div>
-                        <div className="col-md-6 mb-3">
+                        <div className="col-md-3 mb-3">
                             <label className="form-label">Role</label>
-                            <select 
-                                className="form-select" 
+                            <input 
+                                type="text" 
+                                className="form-control" 
                                 name="role"
                                 value={staffForm.role}
                                 onChange={handleStaffFormChange}
+                                placeholder="Enter role" 
                                 required
-                            >
-                                <option value="">Select a role</option>
-                                <option value="Trainer">Trainer</option>
-                                <option value="Manager">Manager</option>
-                                <option value="Receptionist">Receptionist</option>
-                                <option value="Admin">Admin</option>
-                            </select>
+                            />
                         </div>
                     </div>
-                    <button type="submit" className="btn btn-primary">Add Staff</button>
+                    <button type="submit" className="btn btn-primary">Add Staff Member</button>
                 </form>
             </div>
             
             <div className="table-container">
-                <h4>All Staff</h4>
+                <h4>All Staff Members</h4>
                 <table className="table table-striped">
                     <thead>
                         <tr>
                             <th>ID</th>
                             <th>Name</th>
-                            <th>Email</th>
+<th>Email</th>
                             <th>Phone</th>
                             <th>Role</th>
                             <th>Actions</th>
@@ -1377,7 +1684,7 @@ function Staff({ staffs, onRefresh, loading, error }) {
                                 <td>{staff.phonenumber}</td>
                                 <td>{staff.role}</td>
                                 <td>
-                                    <button className="btn btn-sm btn-outline-primary me-1">Edit</button>
+                                    <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleEditStaff(staff)}>Edit</button>
                                     <button 
                                         className="btn btn-sm btn-outline-danger"
                                         onClick={() => handleDeleteStaff(staff.id)}
@@ -1769,9 +2076,21 @@ function Leads({ leads, onRefresh, loading, error }) {
     const handleAddLead = async (e) => {
         e.preventDefault();
         try {
+            // Convert form data to correct types
+            const phoneNumber = parseInt(leadForm.phonenumber);
+            if (isNaN(phoneNumber)) {
+                alert('Please enter a valid phone number');
+                return;
+            }
+            
+            const leadData = {
+                ...leadForm,
+                phonenumber: phoneNumber
+            };
+            
             await apiCall('/leads/', {
                 method: 'POST',
-                body: JSON.stringify(leadForm)
+                body: JSON.stringify(leadData)
             });
             
             // Reset form
@@ -1818,14 +2137,14 @@ function Leads({ leads, onRefresh, loading, error }) {
                 <form onSubmit={handleAddLead}>
                     <div className="row">
                         <div className="col-md-4 mb-3">
-                            <label className="form-label">Name</label>
+                            <label className="form-label">Full Name</label>
                             <input 
                                 type="text" 
                                 className="form-control" 
                                 name="name"
                                 value={leadForm.name}
                                 onChange={handleLeadFormChange}
-                                placeholder="Enter name" 
+                                placeholder="Enter full name" 
                                 required
                             />
                         </div>
@@ -1843,13 +2162,13 @@ function Leads({ leads, onRefresh, loading, error }) {
                         </div>
                         <div className="col-md-4 mb-3">
                             <label className="form-label">Notes</label>
-                            <input 
-                                type="text" 
+                            <textarea 
                                 className="form-control" 
                                 name="notes"
                                 value={leadForm.notes}
                                 onChange={handleLeadFormChange}
-                                placeholder="Enter notes"
+                                rows="3" 
+                                placeholder="Enter any notes"
                             />
                         </div>
                     </div>
@@ -1858,42 +2177,809 @@ function Leads({ leads, onRefresh, loading, error }) {
             </div>
             
             <div className="table-container">
-                <h4>All Leads ({leads.length})</h4>
-                {leads.length > 0 ? (
-                    <table className="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Name</th>
-                                <th>Phone</th>
-                                <th>Notes</th>
-                                <th>Created At</th>
-                                <th>Actions</th>
+                <h4>All Leads</h4>
+                <table className="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Notes</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {leads.map(lead => (
+                            <tr key={lead.id}>
+                                <td>{lead.id}</td>
+                                <td>{lead.name}</td>
+                                <td>{lead.phonenumber}</td>
+                                <td>{lead.notes || '-'}</td>
+                                <td>{new Date(lead.created_at).toLocaleDateString()}</td>
+                                <td>
+                                    <button className="btn btn-sm btn-outline-primary me-1">Convert</button>
+                                    <button 
+                                        className="btn btn-sm btn-outline-danger"
+                                        onClick={() => handleDeleteLead(lead.id)}
+                                    >
+                                        Delete
+                                    </button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {leads.map(lead => (
-                                <tr key={lead.id}>
-                                    <td>{lead.id}</td>
-                                    <td>{lead.name}</td>
-                                    <td>{lead.phonenumber}</td>
-                                    <td>{lead.notes || '-'}</td>
-                                    <td>{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '-'}</td>
-                                    <td>
-                                        <button 
-                                            className="btn btn-sm btn-outline-danger"
-                                            onClick={() => handleDeleteLead(lead.id)}
-                                        >
-                                            Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <p>No leads found.</p>
-                )}
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+// Reports component
+function Reports({ onRefresh, loading, error }) {
+    const [revenueData, setRevenueData] = useState([]);
+    const [planRevenueData, setPlanRevenueData] = useState([]);
+    const [growthData, setGrowthData] = useState([]);
+    const [planDistributionData, setPlanDistributionData] = useState([]);
+    const [paymentMethodsData, setPaymentMethodsData] = useState([]);
+    const [membershipStatusData, setMembershipStatusData] = useState([]);
+    const [ageDistributionData, setAgeDistributionData] = useState([]);
+    const [genderDistributionData, setGenderDistributionData] = useState([]);
+    const [revenuePeriod, setRevenuePeriod] = useState('monthly');
+    const [growthPeriod, setGrowthPeriod] = useState('monthly');
+    
+    // View modes for each chart (visual or text)
+    const [viewModes, setViewModes] = useState({
+        revenue: 'visual',
+        planRevenue: 'visual',
+        planDistribution: 'visual',
+        growth: 'visual',
+        paymentMethods: 'visual',
+        membershipStatus: 'visual',
+        ageDistribution: 'visual',
+        genderDistribution: 'visual'
+    });
+
+    // Fetch all report data
+    const fetchReportData = async () => {
+        try {
+            // Fetch revenue data
+            const revenueResponse = await apiCall(`/reports/revenue?period=${revenuePeriod}`);
+            setRevenueData(revenueResponse.revenue_data || []);
+            
+            // Fetch revenue by plan
+            const planRevenueResponse = await apiCall('/reports/revenue-by-plan');
+            setPlanRevenueData(planRevenueResponse.plan_revenue || []);
+            
+            // Fetch client growth data
+            const growthResponse = await apiCall(`/reports/client-growth?period=${growthPeriod}`);
+            setGrowthData(growthResponse.growth_data || []);
+            
+            // Fetch plan distribution
+            const planDistributionResponse = await apiCall('/reports/plan-distribution');
+            setPlanDistributionData(planDistributionResponse.plan_distribution || []);
+            
+            // Fetch payment methods
+            const paymentMethodsResponse = await apiCall('/reports/payment-methods');
+            setPaymentMethodsData(paymentMethodsResponse.payment_methods || []);
+            
+            // Fetch membership status
+            const membershipStatusResponse = await apiCall('/reports/membership-status');
+            setMembershipStatusData(membershipStatusResponse.membership_status || []);
+            
+            // Fetch age distribution
+            const ageDistributionResponse = await apiCall('/reports/age-distribution');
+            setAgeDistributionData(ageDistributionResponse.age_distribution || []);
+            
+            // Fetch gender distribution
+            const genderDistributionResponse = await apiCall('/reports/gender-distribution');
+            setGenderDistributionData(genderDistributionResponse.gender_distribution || []);
+        } catch (err) {
+            console.error('Failed to fetch report data:', err);
+            // Set all data states to empty arrays to prevent undefined errors
+            setRevenueData([]);
+            setPlanRevenueData([]);
+            setGrowthData([]);
+            setPlanDistributionData([]);
+            setPaymentMethodsData([]);
+            setMembershipStatusData([]);
+            setAgeDistributionData([]);
+            setGenderDistributionData([]);
+            // Show error message to user
+            alert('Failed to load report data. Please try again.');
+        }
+    };
+
+    // Load data when component mounts
+    useEffect(() => {
+        fetchReportData();
+    }, [revenuePeriod, growthPeriod]);
+    
+    // Render charts when data changes
+    useEffect(() => {
+        // Render revenue chart
+        if (revenueData.length > 0 && window.Plotly) {
+            setTimeout(() => {
+                const revenueChartElement = document.getElementById('revenue-chart');
+                if (revenueChartElement) {
+                    try {
+                        window.Plotly.newPlot(revenueChartElement, revenueChartData, { 
+                            title: 'Revenue Overview',
+                            xaxis: { title: 'Period' },
+                            yaxis: { title: 'Revenue ($)' }
+                        });
+                    } catch (error) {
+                        console.error('Error rendering revenue chart:', error);
+                        revenueChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                    }
+                }
+            }, 100);
+        }
+        
+        // Render plan revenue chart
+        if (planRevenueData.length > 0 && window.Plotly) {
+            setTimeout(() => {
+                const planRevenueChartElement = document.getElementById('plan-revenue-chart');
+                if (planRevenueChartElement) {
+                    try {
+                        window.Plotly.newPlot(planRevenueChartElement, planRevenueChartData, { 
+                            title: 'Revenue by Membership Plan',
+                            xaxis: { title: 'Plan' },
+                            yaxis: { title: 'Revenue ($)' }
+                        });
+                    } catch (error) {
+                        console.error('Error rendering plan revenue chart:', error);
+                        planRevenueChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                    }
+                }
+            }, 100);
+        }
+        
+        // Render plan distribution chart
+        if (planDistributionData.length > 0 && window.Plotly) {
+            setTimeout(() => {
+                const planDistributionChartElement = document.getElementById('plan-distribution-chart');
+                if (planDistributionChartElement) {
+                    try {
+                        window.Plotly.newPlot(planDistributionChartElement, planDistributionChartData, { 
+                            title: 'Client Distribution by Plan'
+                        });
+                    } catch (error) {
+                        console.error('Error rendering plan distribution chart:', error);
+                        planDistributionChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                    }
+                }
+            }, 100);
+        }
+        
+        // Render growth chart
+        if (growthData.length > 0 && window.Plotly) {
+            setTimeout(() => {
+                const growthChartElement = document.getElementById('growth-chart');
+                if (growthChartElement) {
+                    try {
+                        window.Plotly.newPlot(growthChartElement, growthChartData, { 
+                            title: 'New Clients Over Time',
+                            xaxis: { title: 'Period' },
+                            yaxis: { title: 'New Clients' }
+                        });
+                    } catch (error) {
+                        console.error('Error rendering growth chart:', error);
+                        growthChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                    }
+                }
+            }, 100);
+        }
+        
+        // Render payment methods chart
+        if (paymentMethodsData.length > 0 && window.Plotly) {
+            setTimeout(() => {
+                const paymentMethodsChartElement = document.getElementById('payment-methods-chart');
+                if (paymentMethodsChartElement) {
+                    try {
+                        window.Plotly.newPlot(paymentMethodsChartElement, paymentMethodsChartData, { 
+                            title: 'Payment Methods',
+                            xaxis: { title: 'Method' },
+                            yaxis: { title: 'Count' }
+                        });
+                    } catch (error) {
+                        console.error('Error rendering payment methods chart:', error);
+                        paymentMethodsChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                    }
+                }
+            }, 100);
+        }
+        
+        // Render membership status chart
+        if (membershipStatusData.length > 0 && window.Plotly) {
+            setTimeout(() => {
+                const membershipStatusChartElement = document.getElementById('membership-status-chart');
+                if (membershipStatusChartElement) {
+                    try {
+                        window.Plotly.newPlot(membershipStatusChartElement, membershipStatusChartData, { 
+                            title: 'Membership Status'
+                        });
+                    } catch (error) {
+                        console.error('Error rendering membership status chart:', error);
+                        membershipStatusChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                    }
+                }
+            }, 100);
+        }
+        
+        // Render age distribution chart
+        if (ageDistributionData.length > 0 && window.Plotly) {
+            setTimeout(() => {
+                const ageDistributionChartElement = document.getElementById('age-distribution-chart');
+                if (ageDistributionChartElement) {
+                    try {
+                        window.Plotly.newPlot(ageDistributionChartElement, ageDistributionChartData, { 
+                            title: 'Age Distribution',
+                            xaxis: { title: 'Age Group' },
+                            yaxis: { title: 'Count' }
+                        });
+                    } catch (error) {
+                        console.error('Error rendering age distribution chart:', error);
+                        ageDistributionChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                    }
+                }
+            }, 100);
+        }
+        
+        // Render gender distribution chart
+        if (genderDistributionData.length > 0 && window.Plotly) {
+            setTimeout(() => {
+                const genderDistributionChartElement = document.getElementById('gender-distribution-chart');
+                if (genderDistributionChartElement) {
+                    try {
+                        window.Plotly.newPlot(genderDistributionChartElement, genderDistributionChartData, { 
+                            title: 'Gender Distribution'
+                        });
+                    } catch (error) {
+                        console.error('Error rendering gender distribution chart:', error);
+                        genderDistributionChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                    }
+                }
+            }, 100);
+        }
+    }, [safeRevenueData, safePlanRevenueData, safePlanDistributionData, safeGrowthData, safePaymentMethodsData, safeMembershipStatusData, safeAgeDistributionData, safeGenderDistributionData]);
+
+    // Handle period changes
+    const handleRevenuePeriodChange = (period) => {
+        setRevenuePeriod(period);
+    };
+
+    const handleGrowthPeriodChange = (period) => {
+        setGrowthPeriod(period);
+    };
+    
+    // Toggle view mode for a chart
+    const toggleViewMode = (chartName) => {
+        setViewModes(prev => ({
+            ...prev,
+            [chartName]: prev[chartName] === 'visual' ? 'text' : 'visual'
+        }));
+    };
+    
+    // Render Plotly chart
+    const renderChart = (chartId, data, layout = {}) => {
+        // We'll render the chart container and handle the plotting in useEffect of the Reports component
+        return <div id={chartId} style={{ width: '100%', height: '400px' }}></div>;
+    };
+    
+    // Chart data preparations
+    const revenueChartData = safeRevenueData && safeRevenueData.length > 0 ? [{
+        x: safeRevenueData.map(item => item && item.period ? item.period : ''),
+        y: safeRevenueData.map(item => item && item.total_revenue !== undefined ? item.total_revenue : 0),
+        type: 'bar',
+        marker: { color: '#4e73df' }
+    }] : [];
+    
+    const planRevenueChartData = safePlanRevenueData && safePlanRevenueData.length > 0 ? [{
+        x: safePlanRevenueData.map(item => item && item.plan_name ? item.plan_name : ''),
+        y: safePlanRevenueData.map(item => item && item.total_revenue !== undefined ? item.total_revenue : 0),
+        type: 'bar',
+        marker: { color: '#1cc88a' }
+    }] : [];
+    
+    const planDistributionChartData = safePlanDistributionData && safePlanDistributionData.length > 0 ? [{
+        labels: safePlanDistributionData.map(item => item && item.plan_name ? item.plan_name : ''),
+        values: safePlanDistributionData.map(item => item && item.client_count !== undefined ? item.client_count : 0),
+        type: 'pie',
+        marker: { colors: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'] }
+    }] : [];
+    
+    const growthChartData = safeGrowthData && safeGrowthData.length > 0 ? [{
+        x: safeGrowthData.map(item => item && item.period ? item.period : ''),
+        y: safeGrowthData.map(item => item && item.new_clients !== undefined ? item.new_clients : 0),
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: { color: '#4e73df' },
+        marker: { color: '#4e73df' }
+    }] : [];
+    
+    const paymentMethodsChartData = safePaymentMethodsData && safePaymentMethodsData.length > 0 ? [{
+        x: safePaymentMethodsData.map(item => item && item.method ? item.method : ''),
+        y: safePaymentMethodsData.map(item => item && item.count !== undefined ? item.count : 0),
+        type: 'bar',
+        marker: { color: '#6f42c1' }
+    }] : [];
+    
+    const membershipStatusChartData = safeMembershipStatusData && safeMembershipStatusData.length > 0 ? [{
+        labels: safeMembershipStatusData.map(item => item && item.status ? item.status : ''),
+        values: safeMembershipStatusData.map(item => item && item.count !== undefined ? item.count : 0),
+        type: 'pie',
+        marker: { colors: ['#1cc88a', '#f6c23e', '#e74a3b'] }
+    }] : [];
+    
+    const ageDistributionChartData = safeAgeDistributionData && safeAgeDistributionData.length > 0 ? [{
+        x: safeAgeDistributionData.map(item => item && item.age_group ? item.age_group : ''),
+        y: safeAgeDistributionData.map(item => item && item.count !== undefined ? item.count : 0),
+        type: 'bar',
+        marker: { color: '#36b9cc' }
+    }] : [];
+    
+    const genderDistributionChartData = safeGenderDistributionData && safeGenderDistributionData.length > 0 ? [{
+        labels: safeGenderDistributionData.map(item => item && item.gender ? item.gender : ''),
+        values: safeGenderDistributionData.map(item => item && item.count !== undefined ? item.count : 0),
+        type: 'pie',
+        marker: { colors: ['#4e73df', '#e74a3b', '#1cc88a'] }
+    }] : [];
+
+    if (loading) return <div>Loading reports...</div>;
+    if (error) return <div className="alert alert-danger">Error: {error}</div>;
+    
+    // Ensure all data arrays are defined
+    const safeRevenueData = Array.isArray(revenueData) ? revenueData : [];
+    const safePlanRevenueData = Array.isArray(planRevenueData) ? planRevenueData : [];
+    const safeGrowthData = Array.isArray(growthData) ? growthData : [];
+    const safePlanDistributionData = Array.isArray(planDistributionData) ? planDistributionData : [];
+    const safePaymentMethodsData = Array.isArray(paymentMethodsData) ? paymentMethodsData : [];
+    const safeMembershipStatusData = Array.isArray(membershipStatusData) ? membershipStatusData : [];
+    const safeAgeDistributionData = Array.isArray(ageDistributionData) ? ageDistributionData : [];
+    const safeGenderDistributionData = Array.isArray(genderDistributionData) ? genderDistributionData : [];
+
+    return (
+        <div>
+            <h2>Reports & Analytics</h2>
+            
+            {/* Revenue Overview */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="card">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                            <h5>Revenue Overview</h5>
+                            <div className="d-flex align-items-center">
+                                <div className="me-3">
+                                    <button 
+                                        className={`btn btn-sm ${revenuePeriod === 'daily' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => handleRevenuePeriodChange('daily')}
+                                    >
+                                        Daily
+                                    </button>
+                                    <button 
+                                        className={`btn btn-sm mx-2 ${revenuePeriod === 'weekly' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => handleRevenuePeriodChange('weekly')}
+                                    >
+                                        Weekly
+                                    </button>
+                                    <button 
+                                        className={`btn btn-sm mx-2 ${revenuePeriod === 'monthly' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => handleRevenuePeriodChange('monthly')}
+                                    >
+                                        Monthly
+                                    </button>
+                                    <button 
+                                        className={`btn btn-sm ${revenuePeriod === 'yearly' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => handleRevenuePeriodChange('yearly')}
+                                    >
+                                        Yearly
+                                    </button>
+                                </div>
+                                <button 
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => toggleViewMode('revenue')}
+                                >
+                                    {viewModes.revenue === 'visual' ? 'Text View' : 'Visual View'}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="card-body">
+                            {safeRevenueData.length > 0 ? (
+                                viewModes.revenue === 'visual' ? (
+                                    renderChart('revenue-chart', revenueChartData, { 
+                                        title: 'Revenue Overview',
+                                        xaxis: { title: 'Period' },
+                                        yaxis: { title: 'Revenue ($)' }
+                                    })
+                                ) : (
+                                    <div className="chart-container">
+                                        <table className="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Period</th>
+                                                    <th>Revenue ($)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {safeRevenueData.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td>{item && item.period ? item.period : ''}</td>
+                                                        <td>${item && item.total_revenue !== undefined ? item.total_revenue.toFixed(2) : '0.00'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            ) : (
+                                <p>No revenue data available.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Revenue by Plan */}
+            <div className="row mb-4">
+                <div className="col-md-6">
+                    <div className="card">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                            <h5>Revenue by Membership Plan</h5>
+                            <button 
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => toggleViewMode('planRevenue')}
+                            >
+                                {viewModes.planRevenue === 'visual' ? 'Text View' : 'Visual View'}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            {safePlanRevenueData.length > 0 ? (
+                                viewModes.planRevenue === 'visual' ? (
+                                    renderChart('plan-revenue-chart', planRevenueChartData, { 
+                                        title: 'Revenue by Membership Plan',
+                                        xaxis: { title: 'Plan' },
+                                        yaxis: { title: 'Revenue ($)' }
+                                    })
+                                ) : (
+                                    <div className="chart-container">
+                                        <table className="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Plan</th>
+                                                    <th>Revenue ($)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {safePlanRevenueData.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td>{item && item.plan_name ? item.plan_name : ''}</td>
+                                                        <td>${item && item.total_revenue !== undefined ? item.total_revenue.toFixed(2) : '0.00'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            ) : (
+                                <p>No plan revenue data available.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Plan Distribution */}
+                <div className="col-md-6">
+                    <div className="card">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                            <h5>Client Distribution by Plan</h5>
+                            <button 
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => toggleViewMode('planDistribution')}
+                            >
+                                {viewModes.planDistribution === 'visual' ? 'Text View' : 'Visual View'}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            {safePlanDistributionData.length > 0 ? (
+                                viewModes.planDistribution === 'visual' ? (
+                                    renderChart('plan-distribution-chart', planDistributionChartData, { 
+                                        title: 'Client Distribution by Plan'
+                                    })
+                                ) : (
+                                    <div className="chart-container">
+                                        <table className="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Plan</th>
+                                                    <th>Clients</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {safePlanDistributionData.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td>{item && item.plan_name ? item.plan_name : ''}</td>
+                                                        <td>{item && item.client_count !== undefined ? item.client_count : 0}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            ) : (
+                                <p>No plan distribution data available.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Client Growth */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="card">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                            <h5>New Clients Over Time</h5>
+                            <div className="d-flex align-items-center">
+                                <div className="me-3">
+                                    <button 
+                                        className={`btn btn-sm ${growthPeriod === 'daily' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => handleGrowthPeriodChange('daily')}
+                                    >
+                                        Daily
+                                    </button>
+                                    <button 
+                                        className={`btn btn-sm mx-2 ${growthPeriod === 'weekly' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => handleGrowthPeriodChange('weekly')}
+                                    >
+                                        Weekly
+                                    </button>
+                                    <button 
+                                        className={`btn btn-sm mx-2 ${growthPeriod === 'monthly' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => handleGrowthPeriodChange('monthly')}
+                                    >
+                                        Monthly
+                                    </button>
+                                    <button 
+                                        className={`btn btn-sm ${growthPeriod === 'yearly' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => handleGrowthPeriodChange('yearly')}
+                                    >
+                                        Yearly
+                                    </button>
+                                </div>
+                                <button 
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => toggleViewMode('growth')}
+                                >
+                                    {viewModes.growth === 'visual' ? 'Text View' : 'Visual View'}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="card-body">
+                            {safeGrowthData.length > 0 ? (
+                                viewModes.growth === 'visual' ? (
+                                    renderChart('growth-chart', growthChartData, { 
+                                        title: 'New Clients Over Time',
+                                        xaxis: { title: 'Period' },
+                                        yaxis: { title: 'New Clients' }
+                                    })
+                                ) : (
+                                    <div className="chart-container">
+                                        <table className="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Period</th>
+                                                    <th>New Clients</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {safeGrowthData.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td>{item && item.period ? item.period : ''}</td>
+                                                        <td>{item && item.new_clients !== undefined ? item.new_clients : 0}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            ) : (
+                                <p>No client growth data available.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Additional Metrics */}
+            <div className="row mb-4">
+                {/* Payment Methods */}
+                <div className="col-md-4">
+                    <div className="card">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                            <h5>Payment Methods</h5>
+                            <button 
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => toggleViewMode('paymentMethods')}
+                            >
+                                {viewModes.paymentMethods === 'visual' ? 'Text View' : 'Visual View'}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            {safePaymentMethodsData.length > 0 ? (
+                                viewModes.paymentMethods === 'visual' ? (
+                                    renderChart('payment-methods-chart', paymentMethodsChartData, { 
+                                        title: 'Payment Methods',
+                                        xaxis: { title: 'Method' },
+                                        yaxis: { title: 'Count' }
+                                    })
+                                ) : (
+                                    <div className="chart-container">
+                                        <table className="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Method</th>
+                                                    <th>Count</th>
+                                                    <th>Amount ($)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {safePaymentMethodsData.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td>{item && item.method ? item.method : ''}</td>
+                                                        <td>{item && item.count !== undefined ? item.count : 0}</td>
+                                                        <td>${item && item.total_amount !== undefined ? item.total_amount.toFixed(2) : '0.00'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            ) : (
+                                <p>No payment method data available.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Membership Status */}
+                <div className="col-md-4">
+                    <div className="card">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                            <h5>Membership Status</h5>
+                            <button 
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => toggleViewMode('membershipStatus')}
+                            >
+                                {viewModes.membershipStatus === 'visual' ? 'Text View' : 'Visual View'}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            {safeMembershipStatusData.length > 0 ? (
+                                viewModes.membershipStatus === 'visual' ? (
+                                    renderChart('membership-status-chart', membershipStatusChartData, { 
+                                        title: 'Membership Status'
+                                    })
+                                ) : (
+                                    <div className="chart-container">
+                                        <table className="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Status</th>
+                                                    <th>Count</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {safeMembershipStatusData.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td>{item && item.status ? item.status : ''}</td>
+                                                        <td>{item && item.count !== undefined ? item.count : 0}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            ) : (
+                                <p>No membership status data available.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Age Distribution */}
+                <div className="col-md-4">
+                    <div className="card">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                            <h5>Age Distribution</h5>
+                            <button 
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => toggleViewMode('ageDistribution')}
+                            >
+                                {viewModes.ageDistribution === 'visual' ? 'Text View' : 'Visual View'}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            {safeAgeDistributionData.length > 0 ? (
+                                viewModes.ageDistribution === 'visual' ? (
+                                    renderChart('age-distribution-chart', ageDistributionChartData, { 
+                                        title: 'Age Distribution',
+                                        xaxis: { title: 'Age Group' },
+                                        yaxis: { title: 'Count' }
+                                    })
+                                ) : (
+                                    <div className="chart-container">
+                                        <table className="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Age Group</th>
+                                                    <th>Count</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {safeAgeDistributionData.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td>{item && item.age_group ? item.age_group : ''}</td>
+                                                        <td>{item && item.count !== undefined ? item.count : 0}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            ) : (
+                                <p>No age distribution data available.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Gender Distribution */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="card">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                            <h5>Gender Distribution</h5>
+                            <button 
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => toggleViewMode('genderDistribution')}
+                            >
+                                {viewModes.genderDistribution === 'visual' ? 'Text View' : 'Visual View'}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            {safeGenderDistributionData.length > 0 ? (
+                                viewModes.genderDistribution === 'visual' ? (
+                                    renderChart('gender-distribution-chart', genderDistributionChartData, { 
+                                        title: 'Gender Distribution'
+                                    })
+                                ) : (
+                                    <div className="chart-container">
+                                        <table className="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Gender</th>
+                                                    <th>Count</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {safeGenderDistributionData.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td>{item && item.gender ? item.gender : ''}</td>
+                                                        <td>{item && item.count !== undefined ? item.count : 0}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )
+                            ) : (
+                                <p>No gender distribution data available.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -1902,9 +2988,9 @@ function Leads({ leads, onRefresh, loading, error }) {
 // Footer component
 function Footer() {
     return (
-        <footer className="footer mt-5">
+        <footer className="footer mt-4">
             <div className="container text-center">
-                <p>&copy; 2025 GymEdge. All rights reserved.</p>
+                <p>&copy; 2023 GymEdge. All rights reserved.</p>
             </div>
         </footer>
     );

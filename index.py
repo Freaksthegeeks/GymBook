@@ -10,7 +10,7 @@ from typing import Optional
 import hashlib
 import jwt
 
-from routes import clients, plans, staffs, leads, dashboard, payments
+from routes import clients, plans, staffs, leads, dashboard, payments, reports
 
 
 app = FastAPI()
@@ -106,6 +106,7 @@ app.include_router(staffs.router)
 app.include_router(leads.router)
 app.include_router(dashboard.router)
 app.include_router(payments.router)
+app.include_router(reports.router)
 
 # Authentication Endpoints (keep here)
 
