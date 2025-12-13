@@ -1232,7 +1232,7 @@ function Clients({ clients, plans, onRefresh, loading, error, filterStatus, onFi
                                     >
                                         <option value="">Select</option>
                                         {plans.map(plan => (
-                                            <option key={plan.id} value={plan.id}>{plan.name}</option>
+                                            <option key={plan.id} value={plan.id}>{plan.planname}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -2297,152 +2297,110 @@ function Reports({ onRefresh, loading, error }) {
     
     // Render charts when data changes
     useEffect(() => {
-        // Render revenue chart
-        if (revenueData.length > 0 && window.Plotly) {
-            setTimeout(() => {
-                const revenueChartElement = document.getElementById('revenue-chart');
-                if (revenueChartElement) {
-                    try {
-                        window.Plotly.newPlot(revenueChartElement, revenueChartData, { 
-                            title: 'Revenue Overview',
-                            xaxis: { title: 'Period' },
-                            yaxis: { title: 'Revenue ($)' }
-                        });
-                    } catch (error) {
-                        console.error('Error rendering revenue chart:', error);
-                        revenueChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
-                    }
-                }
-            }, 100);
+        // Only render if Plotly is available
+        if (typeof window.Plotly === 'undefined') {
+            console.error('Plotly is not loaded');
+            return;
         }
         
-        // Render plan revenue chart
-        if (planRevenueData.length > 0 && window.Plotly) {
-            setTimeout(() => {
-                const planRevenueChartElement = document.getElementById('plan-revenue-chart');
-                if (planRevenueChartElement) {
-                    try {
-                        window.Plotly.newPlot(planRevenueChartElement, planRevenueChartData, { 
-                            title: 'Revenue by Membership Plan',
-                            xaxis: { title: 'Plan' },
-                            yaxis: { title: 'Revenue ($)' }
-                        });
-                    } catch (error) {
-                        console.error('Error rendering plan revenue chart:', error);
-                        planRevenueChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+        // Small delay to ensure DOM is ready
+        const timer = setTimeout(() => {
+            // Function to render a single chart with retries
+            const renderChartWithRetry = (elementId, chartData, layout, maxRetries = 3) => {
+                let attempts = 0;
+                
+                const tryRender = () => {
+                    const chartElement = document.getElementById(elementId);
+                    if (chartElement) {
+                        try {
+                            // Clear any existing content
+                            chartElement.innerHTML = '';
+                            window.Plotly.newPlot(chartElement, chartData, layout);
+                        } catch (error) {
+                            console.error(`Error rendering chart ${elementId}:`, error);
+                            chartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
+                        }
+                    } else if (attempts < maxRetries) {
+                        attempts++;
+                        setTimeout(tryRender, 100);
+                    } else {
+                        console.error(`Could not find element with id ${elementId} after ${maxRetries} attempts`);
                     }
-                }
-            }, 100);
-        }
+                };
+                
+                tryRender();
+            };
+            
+            // Render revenue chart
+            if (safeRevenueData.length > 0 && window.Plotly) {
+                renderChartWithRetry('revenue-chart', revenueChartData, { 
+                    title: 'Revenue Overview',
+                    xaxis: { title: 'Period' },
+                    yaxis: { title: 'Revenue ($)' }
+                });
+            }
+            
+            // Render plan revenue chart
+            if (safePlanRevenueData.length > 0 && window.Plotly) {
+                renderChartWithRetry('plan-revenue-chart', planRevenueChartData, { 
+                    title: 'Revenue by Membership Plan',
+                    xaxis: { title: 'Plan' },
+                    yaxis: { title: 'Revenue ($)' }
+                });
+            }
+            
+            // Render plan distribution chart
+            if (safePlanDistributionData.length > 0 && window.Plotly) {
+                renderChartWithRetry('plan-distribution-chart', planDistributionChartData, { 
+                    title: 'Client Distribution by Plan'
+                });
+            }
+            
+            // Render growth chart
+            if (safeGrowthData.length > 0 && window.Plotly) {
+                renderChartWithRetry('growth-chart', growthChartData, { 
+                    title: 'New Clients Over Time',
+                    xaxis: { title: 'Period' },
+                    yaxis: { title: 'New Clients' }
+                });
+            }
+            
+            // Render payment methods chart
+            if (safePaymentMethodsData.length > 0 && window.Plotly) {
+                renderChartWithRetry('payment-methods-chart', paymentMethodsChartData, { 
+                    title: 'Payment Methods',
+                    xaxis: { title: 'Method' },
+                    yaxis: { title: 'Count' }
+                });
+            }
+            
+            // Render membership status chart
+            if (safeMembershipStatusData.length > 0 && window.Plotly) {
+                renderChartWithRetry('membership-status-chart', membershipStatusChartData, { 
+                    title: 'Membership Status'
+                });
+            }
+            
+            // Render age distribution chart
+            if (safeAgeDistributionData.length > 0 && window.Plotly) {
+                renderChartWithRetry('age-distribution-chart', ageDistributionChartData, { 
+                    title: 'Age Distribution',
+                    xaxis: { title: 'Age Group' },
+                    yaxis: { title: 'Count' }
+                });
+            }
+            
+            // Render gender distribution chart
+            if (safeGenderDistributionData.length > 0 && window.Plotly) {
+                renderChartWithRetry('gender-distribution-chart', genderDistributionChartData, { 
+                    title: 'Gender Distribution'
+                });
+            }
+        }, 100); // 100ms delay
         
-        // Render plan distribution chart
-        if (planDistributionData.length > 0 && window.Plotly) {
-            setTimeout(() => {
-                const planDistributionChartElement = document.getElementById('plan-distribution-chart');
-                if (planDistributionChartElement) {
-                    try {
-                        window.Plotly.newPlot(planDistributionChartElement, planDistributionChartData, { 
-                            title: 'Client Distribution by Plan'
-                        });
-                    } catch (error) {
-                        console.error('Error rendering plan distribution chart:', error);
-                        planDistributionChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
-                    }
-                }
-            }, 100);
-        }
-        
-        // Render growth chart
-        if (growthData.length > 0 && window.Plotly) {
-            setTimeout(() => {
-                const growthChartElement = document.getElementById('growth-chart');
-                if (growthChartElement) {
-                    try {
-                        window.Plotly.newPlot(growthChartElement, growthChartData, { 
-                            title: 'New Clients Over Time',
-                            xaxis: { title: 'Period' },
-                            yaxis: { title: 'New Clients' }
-                        });
-                    } catch (error) {
-                        console.error('Error rendering growth chart:', error);
-                        growthChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
-                    }
-                }
-            }, 100);
-        }
-        
-        // Render payment methods chart
-        if (paymentMethodsData.length > 0 && window.Plotly) {
-            setTimeout(() => {
-                const paymentMethodsChartElement = document.getElementById('payment-methods-chart');
-                if (paymentMethodsChartElement) {
-                    try {
-                        window.Plotly.newPlot(paymentMethodsChartElement, paymentMethodsChartData, { 
-                            title: 'Payment Methods',
-                            xaxis: { title: 'Method' },
-                            yaxis: { title: 'Count' }
-                        });
-                    } catch (error) {
-                        console.error('Error rendering payment methods chart:', error);
-                        paymentMethodsChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
-                    }
-                }
-            }, 100);
-        }
-        
-        // Render membership status chart
-        if (membershipStatusData.length > 0 && window.Plotly) {
-            setTimeout(() => {
-                const membershipStatusChartElement = document.getElementById('membership-status-chart');
-                if (membershipStatusChartElement) {
-                    try {
-                        window.Plotly.newPlot(membershipStatusChartElement, membershipStatusChartData, { 
-                            title: 'Membership Status'
-                        });
-                    } catch (error) {
-                        console.error('Error rendering membership status chart:', error);
-                        membershipStatusChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
-                    }
-                }
-            }, 100);
-        }
-        
-        // Render age distribution chart
-        if (ageDistributionData.length > 0 && window.Plotly) {
-            setTimeout(() => {
-                const ageDistributionChartElement = document.getElementById('age-distribution-chart');
-                if (ageDistributionChartElement) {
-                    try {
-                        window.Plotly.newPlot(ageDistributionChartElement, ageDistributionChartData, { 
-                            title: 'Age Distribution',
-                            xaxis: { title: 'Age Group' },
-                            yaxis: { title: 'Count' }
-                        });
-                    } catch (error) {
-                        console.error('Error rendering age distribution chart:', error);
-                        ageDistributionChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
-                    }
-                }
-            }, 100);
-        }
-        
-        // Render gender distribution chart
-        if (genderDistributionData.length > 0 && window.Plotly) {
-            setTimeout(() => {
-                const genderDistributionChartElement = document.getElementById('gender-distribution-chart');
-                if (genderDistributionChartElement) {
-                    try {
-                        window.Plotly.newPlot(genderDistributionChartElement, genderDistributionChartData, { 
-                            title: 'Gender Distribution'
-                        });
-                    } catch (error) {
-                        console.error('Error rendering gender distribution chart:', error);
-                        genderDistributionChartElement.innerHTML = '<div class="alert alert-warning">Unable to render chart. Please try again.</div>';
-                    }
-                }
-            }, 100);
-        }
-    }, [safeRevenueData, safePlanRevenueData, safePlanDistributionData, safeGrowthData, safePaymentMethodsData, safeMembershipStatusData, safeAgeDistributionData, safeGenderDistributionData]);
+        // Cleanup timeout
+        return () => clearTimeout(timer);
+    }, [revenueData, planRevenueData, planDistributionData, growthData, paymentMethodsData, membershipStatusData, ageDistributionData, genderDistributionData]);
 
     // Handle period changes
     const handleRevenuePeriodChange = (period) => {
@@ -2467,6 +2425,19 @@ function Reports({ onRefresh, loading, error }) {
         return <div id={chartId} style={{ width: '100%', height: '400px' }}></div>;
     };
     
+    if (loading) return <div>Loading reports...</div>;
+    if (error) return <div className="alert alert-danger">Error: {error}</div>;
+    
+    // Ensure all data arrays are defined
+    const safeRevenueData = Array.isArray(revenueData) ? revenueData : [];
+    const safePlanRevenueData = Array.isArray(planRevenueData) ? planRevenueData : [];
+    const safeGrowthData = Array.isArray(growthData) ? growthData : [];
+    const safePlanDistributionData = Array.isArray(planDistributionData) ? planDistributionData : [];
+    const safePaymentMethodsData = Array.isArray(paymentMethodsData) ? paymentMethodsData : [];
+    const safeMembershipStatusData = Array.isArray(membershipStatusData) ? membershipStatusData : [];
+    const safeAgeDistributionData = Array.isArray(ageDistributionData) ? ageDistributionData : [];
+    const safeGenderDistributionData = Array.isArray(genderDistributionData) ? genderDistributionData : [];
+
     // Chart data preparations
     const revenueChartData = safeRevenueData && safeRevenueData.length > 0 ? [{
         x: safeRevenueData.map(item => item && item.period ? item.period : ''),
@@ -2525,19 +2496,6 @@ function Reports({ onRefresh, loading, error }) {
         type: 'pie',
         marker: { colors: ['#4e73df', '#e74a3b', '#1cc88a'] }
     }] : [];
-
-    if (loading) return <div>Loading reports...</div>;
-    if (error) return <div className="alert alert-danger">Error: {error}</div>;
-    
-    // Ensure all data arrays are defined
-    const safeRevenueData = Array.isArray(revenueData) ? revenueData : [];
-    const safePlanRevenueData = Array.isArray(planRevenueData) ? planRevenueData : [];
-    const safeGrowthData = Array.isArray(growthData) ? growthData : [];
-    const safePlanDistributionData = Array.isArray(planDistributionData) ? planDistributionData : [];
-    const safePaymentMethodsData = Array.isArray(paymentMethodsData) ? paymentMethodsData : [];
-    const safeMembershipStatusData = Array.isArray(membershipStatusData) ? membershipStatusData : [];
-    const safeAgeDistributionData = Array.isArray(ageDistributionData) ? ageDistributionData : [];
-    const safeGenderDistributionData = Array.isArray(genderDistributionData) ? genderDistributionData : [];
 
     return (
         <div>
