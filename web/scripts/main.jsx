@@ -2545,13 +2545,15 @@ function Reports({ onRefresh, loading, error }) {
                         <div className="card-body">
                             {safeRevenueData.length > 0 ? (
                                 viewModes.revenue === 'visual' ? (
-                                    renderChart('revenue-chart', revenueChartData, { 
-                                        title: 'Revenue Overview',
-                                        xaxis: { title: 'Period' },
-                                        yaxis: { title: 'Revenue ($)' }
-                                    })
+                                    <div key="revenue-visual">
+                                        {renderChart('revenue-chart', revenueChartData, { 
+                                            title: 'Revenue Overview',
+                                            xaxis: { title: 'Period' },
+                                            yaxis: { title: 'Revenue ($)' }
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="chart-container">
+                                    <div key="revenue-text" className="chart-container">
                                         <table className="table table-striped">
                                             <thead>
                                                 <tr>
@@ -2594,13 +2596,15 @@ function Reports({ onRefresh, loading, error }) {
                         <div className="card-body">
                             {safePlanRevenueData.length > 0 ? (
                                 viewModes.planRevenue === 'visual' ? (
-                                    renderChart('plan-revenue-chart', planRevenueChartData, { 
-                                        title: 'Revenue by Membership Plan',
-                                        xaxis: { title: 'Plan' },
-                                        yaxis: { title: 'Revenue ($)' }
-                                    })
+                                    <div key="plan-revenue-visual">
+                                        {renderChart('plan-revenue-chart', planRevenueChartData, { 
+                                            title: 'Revenue by Membership Plan',
+                                            xaxis: { title: 'Plan' },
+                                            yaxis: { title: 'Revenue ($)' }
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="chart-container">
+                                    <div key="plan-revenue-text" className="chart-container">
                                         <table className="table table-striped">
                                             <thead>
                                                 <tr>
@@ -2641,11 +2645,13 @@ function Reports({ onRefresh, loading, error }) {
                         <div className="card-body">
                             {safePlanDistributionData.length > 0 ? (
                                 viewModes.planDistribution === 'visual' ? (
-                                    renderChart('plan-distribution-chart', planDistributionChartData, { 
-                                        title: 'Client Distribution by Plan'
-                                    })
+                                    <div key="plan-distribution-visual">
+                                        {renderChart('plan-distribution-chart', planDistributionChartData, { 
+                                            title: 'Client Distribution by Plan'
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="chart-container">
+                                    <div key="plan-distribution-text" className="chart-container">
                                         <table className="table table-striped">
                                             <thead>
                                                 <tr>
@@ -2716,13 +2722,15 @@ function Reports({ onRefresh, loading, error }) {
                         <div className="card-body">
                             {safeGrowthData.length > 0 ? (
                                 viewModes.growth === 'visual' ? (
-                                    renderChart('growth-chart', growthChartData, { 
-                                        title: 'New Clients Over Time',
-                                        xaxis: { title: 'Period' },
-                                        yaxis: { title: 'New Clients' }
-                                    })
+                                    <div key="growth-visual">
+                                        {renderChart('growth-chart', growthChartData, { 
+                                            title: 'New Clients Over Time',
+                                            xaxis: { title: 'Period' },
+                                            yaxis: { title: 'New Clients' }
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="chart-container">
+                                    <div key="growth-text" className="chart-container">
                                         <table className="table table-striped">
                                             <thead>
                                                 <tr>
@@ -2766,13 +2774,15 @@ function Reports({ onRefresh, loading, error }) {
                         <div className="card-body">
                             {safePaymentMethodsData.length > 0 ? (
                                 viewModes.paymentMethods === 'visual' ? (
-                                    renderChart('payment-methods-chart', paymentMethodsChartData, { 
-                                        title: 'Payment Methods',
-                                        xaxis: { title: 'Method' },
-                                        yaxis: { title: 'Count' }
-                                    })
+                                    <div key="payment-methods-visual">
+                                        {renderChart('payment-methods-chart', paymentMethodsChartData, { 
+                                            title: 'Payment Methods',
+                                            xaxis: { title: 'Method' },
+                                            yaxis: { title: 'Count' }
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="chart-container">
+                                    <div key="payment-methods-text" className="chart-container">
                                         <table className="table table-striped">
                                             <thead>
                                                 <tr>
@@ -2815,11 +2825,13 @@ function Reports({ onRefresh, loading, error }) {
                         <div className="card-body">
                             {safeMembershipStatusData.length > 0 ? (
                                 viewModes.membershipStatus === 'visual' ? (
-                                    renderChart('membership-status-chart', membershipStatusChartData, { 
-                                        title: 'Membership Status'
-                                    })
+                                    <div key="membership-status-visual">
+                                        {renderChart('membership-status-chart', membershipStatusChartData, { 
+                                            title: 'Membership Status'
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="chart-container">
+                                    <div key="membership-status-text" className="chart-container">
                                         <table className="table table-striped">
                                             <thead>
                                                 <tr>
@@ -2860,13 +2872,15 @@ function Reports({ onRefresh, loading, error }) {
                         <div className="card-body">
                             {safeAgeDistributionData.length > 0 ? (
                                 viewModes.ageDistribution === 'visual' ? (
-                                    renderChart('age-distribution-chart', ageDistributionChartData, { 
-                                        title: 'Age Distribution',
-                                        xaxis: { title: 'Age Group' },
-                                        yaxis: { title: 'Count' }
-                                    })
+                                    <div key="age-distribution-visual">
+                                        {renderChart('age-distribution-chart', ageDistributionChartData, { 
+                                            title: 'Age Distribution',
+                                            xaxis: { title: 'Age Group' },
+                                            yaxis: { title: 'Count' }
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="chart-container">
+                                    <div key="age-distribution-text" className="chart-container">
                                         <table className="table table-striped">
                                             <thead>
                                                 <tr>
@@ -2909,11 +2923,13 @@ function Reports({ onRefresh, loading, error }) {
                         <div className="card-body">
                             {safeGenderDistributionData.length > 0 ? (
                                 viewModes.genderDistribution === 'visual' ? (
-                                    renderChart('gender-distribution-chart', genderDistributionChartData, { 
-                                        title: 'Gender Distribution'
-                                    })
+                                    <div key="gender-distribution-visual">
+                                        {renderChart('gender-distribution-chart', genderDistributionChartData, { 
+                                            title: 'Gender Distribution'
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="chart-container">
+                                    <div key="gender-distribution-text" className="chart-container">
                                         <table className="table table-striped">
                                             <thead>
                                                 <tr>
