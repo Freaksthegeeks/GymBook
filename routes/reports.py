@@ -1,12 +1,14 @@
 from fastapi import APIRouter
 from config import database
+from fastapi import Depends
+from index import get_current_user, get_current_gym_id
 from typing import Optional
 from datetime import datetime, timedelta
 
 router = APIRouter()
 
 @router.get("/reports/revenue")
-def get_revenue_report(period: str = "monthly"):
+def get_revenue_report(period: str = "monthly", current_gym_id: int = Depends(get_current_gym_id)):
     """Get revenue data for charts"""
     if period == "daily":
         date_trunc = "DAY"
@@ -26,11 +28,13 @@ def get_revenue_report(period: str = "monthly"):
             SELECT 
                 DATE_TRUNC('{date_trunc}', paid_at::date) as period,
                 SUM(amount) as total_revenue
-            FROM payments 
+            FROM payments p
+            JOIN clients c ON p.client_id = c.id
             WHERE paid_at >= CURRENT_DATE - INTERVAL '{interval}'
+                AND c.gym_id = %s
             GROUP BY period
             ORDER BY period
-        """)
+        """, (current_gym_id,))
         
         rows = database.cur.fetchall()
         revenue_data = []
@@ -55,7 +59,7 @@ def get_revenue_report(period: str = "monthly"):
         return {"revenue_data": [], "error": str(e)}
 
 @router.get("/reports/revenue-by-plan")
-def get_revenue_by_plan():
+def get_revenue_by_plan(current_gym_id: int = Depends(get_current_gym_id)):
     """Get revenue broken down by membership plan"""
     try:
         database.cur.execute("""
@@ -65,9 +69,10 @@ def get_revenue_by_plan():
             FROM plans p
             LEFT JOIN clients c ON p.id = c.plan_id
             LEFT JOIN payments pay ON c.id = pay.client_id
+            WHERE p.gym_id = %s AND c.gym_id = %s
             GROUP BY p.id, p.planname
             ORDER BY total_revenue DESC
-        """)
+        """, (current_gym_id, current_gym_id))
         
         rows = database.cur.fetchall()
         plan_revenue = []
@@ -87,7 +92,7 @@ def get_revenue_by_plan():
         return {"plan_revenue": [], "error": str(e)}
 
 @router.get("/reports/client-growth")
-def get_client_growth(period: str = "monthly"):
+def get_client_growth(period: str = "monthly", current_gym_id: int = Depends(get_current_gym_id)):
     """Get client growth data"""
     if period == "daily":
         date_trunc = "DAY"
@@ -109,9 +114,10 @@ def get_client_growth(period: str = "monthly"):
                 COUNT(*) as new_clients
             FROM clients 
             WHERE created_at >= CURRENT_DATE - INTERVAL '{interval}'
+                AND gym_id = %s
             GROUP BY period
             ORDER BY period
-        """)
+        """, (current_gym_id,))
         
         rows = database.cur.fetchall()
         growth_data = []
@@ -136,7 +142,7 @@ def get_client_growth(period: str = "monthly"):
         return {"growth_data": [], "error": str(e)}
 
 @router.get("/reports/plan-distribution")
-def get_plan_distribution():
+def get_plan_distribution(current_gym_id: int = Depends(get_current_gym_id)):
     """Get distribution of clients by plan"""
     try:
         database.cur.execute("""
@@ -145,9 +151,10 @@ def get_plan_distribution():
                 COUNT(c.id) as client_count
             FROM plans p
             LEFT JOIN clients c ON p.id = c.plan_id
+            WHERE p.gym_id = %s AND c.gym_id = %s
             GROUP BY p.id, p.planname
             ORDER BY client_count DESC
-        """)
+        """, (current_gym_id, current_gym_id))
         
         rows = database.cur.fetchall()
         plan_distribution = []
@@ -167,7 +174,7 @@ def get_plan_distribution():
         return {"plan_distribution": [], "error": str(e)}
 
 @router.get("/reports/payment-methods")
-def get_payment_methods():
+def get_payment_methods(current_gym_id: int = Depends(get_current_gym_id)):
     """Get payment method distribution"""
     try:
         database.cur.execute("""
@@ -175,11 +182,13 @@ def get_payment_methods():
                 method,
                 COUNT(*) as count,
                 SUM(amount) as total_amount
-            FROM payments 
+            FROM payments p
+            JOIN clients c ON p.client_id = c.id
             WHERE method IS NOT NULL
+                AND c.gym_id = %s
             GROUP BY method
             ORDER BY total_amount DESC
-        """)
+        """, (current_gym_id,))
         
         rows = database.cur.fetchall()
         payment_methods = []
@@ -200,7 +209,7 @@ def get_payment_methods():
         return {"payment_methods": [], "error": str(e)}
 
 @router.get("/reports/membership-status")
-def get_membership_status():
+def get_membership_status(current_gym_id: int = Depends(get_current_gym_id)):
     """Get membership status distribution"""
     try:
         database.cur.execute("""
@@ -212,9 +221,10 @@ def get_membership_status():
                 END as status,
                 COUNT(*) as count
             FROM clients
+            WHERE gym_id = %s
             GROUP BY status
             ORDER BY count DESC
-        """)
+        """, (current_gym_id,))
         
         rows = database.cur.fetchall()
         membership_status = []
@@ -234,7 +244,7 @@ def get_membership_status():
         return {"membership_status": [], "error": str(e)}
 
 @router.get("/reports/age-distribution")
-def get_age_distribution():
+def get_age_distribution(current_gym_id: int = Depends(get_current_gym_id)):
     """Get client age distribution"""
     try:
         database.cur.execute("""
@@ -254,7 +264,7 @@ def get_age_distribution():
                     END as age_group,
                     COUNT(*) as count
                 FROM clients
-                WHERE dateofbirth IS NOT NULL
+                WHERE dateofbirth IS NOT NULL AND gym_id = %s
                 GROUP BY 
                     CASE 
                         WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, dateofbirth::date)) < 18 THEN '<18'
@@ -276,7 +286,7 @@ def get_age_distribution():
                     WHEN '55+' THEN 6
                     ELSE 7
                 END
-        """)
+        """, (current_gym_id,))
         
         rows = database.cur.fetchall()
         age_distribution = []
@@ -296,7 +306,7 @@ def get_age_distribution():
         return {"age_distribution": [], "error": str(e)}
 
 @router.get("/reports/gender-distribution")
-def get_gender_distribution():
+def get_gender_distribution(current_gym_id: int = Depends(get_current_gym_id)):
     """Get client gender distribution"""
     try:
         database.cur.execute("""
@@ -304,9 +314,10 @@ def get_gender_distribution():
                 gender,
                 COUNT(*) as count
             FROM clients
+            WHERE gym_id = %s
             GROUP BY gender
             ORDER BY count DESC
-        """)
+        """, (current_gym_id,))
         
         rows = database.cur.fetchall()
         gender_distribution = []

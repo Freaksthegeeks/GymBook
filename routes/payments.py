@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from config import database
+from fastapi import Depends
+from index import get_current_user, get_current_gym_id
 
 router = APIRouter()
 
@@ -15,24 +17,28 @@ class PaymentModel(BaseModel):
 
 
 @router.get("/payments/")
-def get_payments(client_id: Optional[int] = None):
+def get_payments(client_id: Optional[int] = None, current_gym_id: int = Depends(get_current_gym_id)):
     if client_id is not None:
         database.cur.execute(
             """
-            SELECT id, client_id, amount, paid_at, note, method, created_at
-            FROM payments
-            WHERE client_id = %s
-            ORDER BY paid_at DESC, id DESC
+            SELECT p.id, p.client_id, p.amount, p.paid_at, p.note, p.method, p.created_at
+            FROM payments p
+            JOIN clients c ON p.client_id = c.id
+            WHERE p.client_id = %s AND c.gym_id = %s
+            ORDER BY p.paid_at DESC, p.id DESC
             """,
-            (client_id,),
+            (client_id, current_gym_id)
         )
     else:
         database.cur.execute(
             """
-            SELECT id, client_id, amount, paid_at, note, method, created_at
-            FROM payments
-            ORDER BY paid_at DESC, id DESC
-            """
+            SELECT p.id, p.client_id, p.amount, p.paid_at, p.note, p.method, p.created_at
+            FROM payments p
+            JOIN clients c ON p.client_id = c.id
+            WHERE c.gym_id = %s
+            ORDER BY p.paid_at DESC, p.id DESC
+            """,
+            (current_gym_id,)
         )
 
     rows = database.cur.fetchall()
@@ -53,15 +59,15 @@ def get_payments(client_id: Optional[int] = None):
 
 
 @router.post("/payments/")
-def create_payment(payment: PaymentModel):
+def create_payment(payment: PaymentModel, current_gym_id: int = Depends(get_current_gym_id)):
     try:
         # First, get the client's plan amount
         database.cur.execute("""
             SELECT p.amount, c.total_paid, c.balance_due
             FROM clients c
             JOIN plans p ON c.plan_id = p.id
-            WHERE c.id = %s
-        """, (payment.client_id,))
+            WHERE c.id = %s AND c.gym_id = %s
+        """, (payment.client_id, current_gym_id))
         
         client_data = database.cur.fetchone()
         if not client_data:
@@ -82,8 +88,8 @@ def create_payment(payment: PaymentModel):
         # Insert payment record
         database.cur.execute(
             """
-            INSERT INTO payments (client_id, amount, paid_at, note, method)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO payments (client_id, amount, paid_at, note, method, gym_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (
@@ -92,6 +98,7 @@ def create_payment(payment: PaymentModel):
                 payment.paid_at,
                 payment.note,
                 payment.method,
+                current_gym_id
             ),
         )
         
@@ -103,9 +110,9 @@ def create_payment(payment: PaymentModel):
             """
             UPDATE clients 
             SET total_paid = %s, balance_due = %s
-            WHERE id = %s
+            WHERE id = %s AND gym_id = %s
             """,
-            (new_paid, new_balance, payment.client_id)
+            (new_paid, new_balance, payment.client_id, current_gym_id)
         )
         
         database.conn.commit()
@@ -123,12 +130,12 @@ def create_payment(payment: PaymentModel):
 
 
 @router.put("/payments/{payment_id}")
-def update_payment(payment_id: int, payment: PaymentModel):
+def update_payment(payment_id: int, payment: PaymentModel, current_gym_id: int = Depends(get_current_gym_id)):
     try:
         # Get the original payment amount
         database.cur.execute(
-            "SELECT client_id, amount FROM payments WHERE id = %s",
-            (payment_id,)
+            "SELECT client_id, amount FROM payments WHERE id = %s AND gym_id = %s",
+            (payment_id, current_gym_id)
         )
         original_payment = database.cur.fetchone()
         if not original_payment:
@@ -142,8 +149,8 @@ def update_payment(payment_id: int, payment: PaymentModel):
             SELECT p.amount, c.total_paid, c.balance_due
             FROM clients c
             JOIN plans p ON c.plan_id = p.id
-            WHERE c.id = %s
-        """, (original_client_id,))
+            WHERE c.id = %s AND c.gym_id = %s
+        """, (original_client_id, current_gym_id))
         
         client_data = database.cur.fetchone()
         if not client_data:
@@ -165,8 +172,8 @@ def update_payment(payment_id: int, payment: PaymentModel):
         database.cur.execute(
             """
             UPDATE payments 
-            SET client_id = %s, amount = %s, paid_at = %s, note = %s, method = %s
-            WHERE id = %s
+            SET client_id = %s, amount = %s, paid_at = %s, note = %s, method = %s, gym_id = %s
+            WHERE id = %s AND gym_id = %s
             """,
             (
                 payment.client_id,
@@ -174,7 +181,9 @@ def update_payment(payment_id: int, payment: PaymentModel):
                 payment.paid_at,
                 payment.note,
                 payment.method,
-                payment_id
+                current_gym_id,
+                payment_id,
+                current_gym_id
             ),
         )
         
@@ -183,9 +192,9 @@ def update_payment(payment_id: int, payment: PaymentModel):
             """
             UPDATE clients 
             SET total_paid = %s, balance_due = %s
-            WHERE id = %s
+            WHERE id = %s AND gym_id = %s
             """,
-            (adjusted_paid, new_balance, payment.client_id)
+            (adjusted_paid, new_balance, payment.client_id, current_gym_id)
         )
         
         database.conn.commit()
@@ -202,12 +211,12 @@ def update_payment(payment_id: int, payment: PaymentModel):
 
 
 @router.delete("/payments/{payment_id}")
-def delete_payment(payment_id: int):
+def delete_payment(payment_id: int, current_gym_id: int = Depends(get_current_gym_id)):
     try:
         # Get the payment details
         database.cur.execute(
-            "SELECT client_id, amount FROM payments WHERE id = %s",
-            (payment_id,)
+            "SELECT client_id, amount FROM payments WHERE id = %s AND gym_id = %s",
+            (payment_id, current_gym_id)
         )
         payment = database.cur.fetchone()
         if not payment:
@@ -221,8 +230,8 @@ def delete_payment(payment_id: int):
             SELECT p.amount, c.total_paid, c.balance_due
             FROM clients c
             JOIN plans p ON c.plan_id = p.id
-            WHERE c.id = %s
-        """, (client_id,))
+            WHERE c.id = %s AND c.gym_id = %s
+        """, (client_id, current_gym_id))
         
         client_data = database.cur.fetchone()
         if not client_data:
@@ -237,8 +246,8 @@ def delete_payment(payment_id: int):
         
         # Delete payment record
         database.cur.execute(
-            "DELETE FROM payments WHERE id = %s",
-            (payment_id,)
+            "DELETE FROM payments WHERE id = %s AND gym_id = %s",
+            (payment_id, current_gym_id)
         )
         
         # Update client's payment status
@@ -246,9 +255,9 @@ def delete_payment(payment_id: int):
             """
             UPDATE clients 
             SET total_paid = %s, balance_due = %s
-            WHERE id = %s
+            WHERE id = %s AND gym_id = %s
             """,
-            (new_paid, new_balance, client_id)
+            (new_paid, new_balance, client_id, current_gym_id)
         )
         
         database.conn.commit()

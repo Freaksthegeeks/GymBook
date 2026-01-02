@@ -10,8 +10,6 @@ from typing import Optional
 import hashlib
 import jwt
 
-from routes import clients, plans, staffs, leads, dashboard, payments, reports
-
 
 app = FastAPI()
 
@@ -78,13 +76,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int = payload.get("sub")
+        current_gym_id: int = payload.get("current_gym_id")
         if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return user_id
+        return {"user_id": user_id, "current_gym_id": current_gym_id}
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -99,14 +98,27 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         )
 
 
-# Include routers
-app.include_router(clients.router)
-app.include_router(plans.router)
-app.include_router(staffs.router)
-app.include_router(leads.router)
-app.include_router(dashboard.router)
-app.include_router(payments.router)
-app.include_router(reports.router)
+def get_current_gym_id(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Helper function to extract only the current gym ID from the token
+    """
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        current_gym_id: int = payload.get("current_gym_id")
+        return current_gym_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 
 # Authentication Endpoints (keep here)
 
@@ -133,6 +145,24 @@ def register_user(user: UserRegister):
         """, (user.username, user.email, hashed_password))
 
         user_id = database.cur.fetchone()[0]
+        database.conn.commit()
+        
+        # Create a default gym for the new user
+        gym_name = f"{user.username}'s Gym"
+        database.cur.execute("""
+            INSERT INTO gyms (name, description)
+            VALUES (%s, %s)
+            RETURNING id
+        """, (gym_name, f"Default gym for {user.username}"))
+        
+        gym_id = database.cur.fetchone()[0]
+        
+        # Add user to their default gym as owner
+        database.cur.execute("""
+            INSERT INTO user_gyms (user_id, gym_id, role, is_owner)
+            VALUES (%s, %s, %s, %s)
+        """, (user_id, gym_id, 'admin', True))
+        
         database.conn.commit()
 
         return {"message": "User registered successfully", "user_id": user_id}
@@ -169,10 +199,40 @@ def login_user(user: UserLogin):
                 detail="Incorrect email or password"
             )
 
+        # Get the user's first gym as the default current gym
+        database.cur.execute("""
+            SELECT gym_id FROM user_gyms 
+            WHERE user_id = %s 
+            ORDER BY is_owner DESC, id ASC
+            LIMIT 1
+        """, (user_id,))
+        
+        gym_result = database.cur.fetchone()
+        current_gym_id = gym_result[0] if gym_result else None
+        
+        # If user has no gym, create a default one
+        if current_gym_id is None:
+            gym_name = f"{username}'s Gym"
+            database.cur.execute("""
+                INSERT INTO gyms (name, description)
+                VALUES (%s, %s)
+                RETURNING id
+            """, (gym_name, f"Default gym for {username}"))
+            
+            new_gym_id = database.cur.fetchone()[0]
+            
+            # Add user to their default gym as owner
+            database.cur.execute("""
+                INSERT INTO user_gyms (user_id, gym_id, role, is_owner)
+                VALUES (%s, %s, %s, %s)
+            """, (user_id, new_gym_id, 'admin', True))
+            
+            current_gym_id = new_gym_id
+
         # Create access token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user_id, "username": username},
+            data={"sub": user_id, "username": username, "current_gym_id": current_gym_id},
             expires_delta=access_token_expires
         )
 
@@ -183,19 +243,26 @@ def login_user(user: UserLogin):
             username=username
         )
 
+        # Commit the transaction if we created a new gym
+        if current_gym_id and gym_result is None:  # We created a new gym
+            database.conn.commit()
+
     except HTTPException:
+        database.conn.rollback()  # Rollback in case of HTTPException
         raise
     except Exception as e:
+        database.conn.rollback()  # Rollback in case of any other exception
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 
 @app.get("/me/", response_model=dict)
-def get_current_user_info(current_user_id: int = Depends(get_current_user)):
+def get_current_user_info(current_user: dict = Depends(get_current_user)):
     try:
+        user_id = current_user["user_id"]
         database.cur.execute("""
             SELECT id, username, email, created_at FROM loggingcredentials 
             WHERE id = %s
-        """, (current_user_id,))
+        """, (user_id,))
 
         user_data = database.cur.fetchone()
         if not user_data:
@@ -205,7 +272,8 @@ def get_current_user_info(current_user_id: int = Depends(get_current_user)):
             "id": user_data[0],
             "username": user_data[1],
             "email": user_data[2],
-            "created_at": str(user_data[3])
+            "created_at": str(user_data[3]),
+            "current_gym_id": current_user["current_gym_id"]
         }
 
     except HTTPException:
@@ -213,6 +281,19 @@ def get_current_user_info(current_user_id: int = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get user info: {str(e)}")
 
+
+# Import routes after all functions are defined
+from routes import clients, plans, staffs, leads, dashboard, payments, reports, gym
+
+# Include routers
+app.include_router(clients.router)
+app.include_router(plans.router)
+app.include_router(staffs.router)
+app.include_router(leads.router)
+app.include_router(dashboard.router)
+app.include_router(payments.router)
+app.include_router(reports.router)
+app.include_router(gym.router)
 
 # Serve the main index.html file
 @app.get("/")

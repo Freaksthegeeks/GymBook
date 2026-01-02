@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from config import database
+from fastapi import Depends
+from index import get_current_user, get_current_gym_id
 
 router = APIRouter()
 
@@ -12,11 +14,11 @@ class PlanModel(BaseModel):
 
 
 @router.post("/plans/")
-def create_plan(plan: PlanModel):
+def create_plan(plan: PlanModel, current_gym_id: int = Depends(get_current_gym_id)):
     try:
         database.cur.execute(
-            "INSERT INTO plans (planname,days,amount) VALUES (%s,%s,%s) RETURNING id",
-            (plan.planname, plan.days, plan.amount),
+            "INSERT INTO plans (planname,days,amount,gym_id) VALUES (%s,%s,%s,%s) RETURNING id",
+            (plan.planname, plan.days, plan.amount, current_gym_id),
         )
         database.conn.commit()
         plan_id = database.cur.fetchone()[0]
@@ -27,8 +29,8 @@ def create_plan(plan: PlanModel):
 
 
 @router.get("/plans/")
-def get_plans():
-    database.cur.execute("SELECT id,planname,days,amount FROM plans order by id")
+def get_plans(current_gym_id: int = Depends(get_current_gym_id)):
+    database.cur.execute("SELECT id,planname,days,amount FROM plans WHERE gym_id = %s ORDER BY id", (current_gym_id,))
     rows = database.cur.fetchall()
     plans = []
     for row in rows:
@@ -42,10 +44,10 @@ def get_plans():
 
 
 @router.put("/plans/{plan_id}")
-def update_plan(plan_id: int, plan: PlanModel):
+def update_plan(plan_id: int, plan: PlanModel, current_gym_id: int = Depends(get_current_gym_id)):
     database.cur.execute(
-        "UPDATE plans SET planname = %s, days = %s, amount = %s WHERE id = %s RETURNING id",
-        (plan.planname, plan.days, plan.amount, plan_id),
+        "UPDATE plans SET planname = %s, days = %s, amount = %s WHERE id = %s AND gym_id = %s RETURNING id",
+        (plan.planname, plan.days, plan.amount, plan_id, current_gym_id),
     )
     database.conn.commit()
     if database.cur.rowcount == 0:
@@ -54,8 +56,8 @@ def update_plan(plan_id: int, plan: PlanModel):
 
 
 @router.delete("/plans/{plan_id}")
-def delete_plan(plan_id: int):
-    database.cur.execute("DELETE FROM plans WHERE id = %s RETURNING id", (plan_id,))
+def delete_plan(plan_id: int, current_gym_id: int = Depends(get_current_gym_id)):
+    database.cur.execute("DELETE FROM plans WHERE id = %s AND gym_id = %s RETURNING id", (plan_id, current_gym_id))
     database.conn.commit()
     if database.cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="plan not found")

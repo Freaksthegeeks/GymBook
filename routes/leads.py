@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 from pydantic import BaseModel
 from config import database
+from fastapi import Depends
+from index import get_current_user, get_current_gym_id
 
 router = APIRouter()
 
@@ -13,11 +15,11 @@ class LeadModel(BaseModel):
 
 
 @router.post("/leads/")
-def create_lead(lead: LeadModel):
+def create_lead(lead: LeadModel, current_gym_id: int = Depends(get_current_gym_id)):
     try:
         database.cur.execute(
-            "INSERT INTO leads (name, phonenumber, notes) VALUES (%s, %s, %s) RETURNING id",
-            (lead.name, lead.phonenumber, lead.notes)
+            "INSERT INTO leads (name, phonenumber, notes, gym_id) VALUES (%s, %s, %s, %s) RETURNING id",
+            (lead.name, lead.phonenumber, lead.notes, current_gym_id)
         )
         database.conn.commit()
         lead_id = database.cur.fetchone()[0]
@@ -28,8 +30,8 @@ def create_lead(lead: LeadModel):
 
 
 @router.get("/leads/")
-def get_leads():
-    database.cur.execute("SELECT id, name, phonenumber, notes, created_at FROM leads ORDER BY created_at DESC")
+def get_leads(current_gym_id: int = Depends(get_current_gym_id)):
+    database.cur.execute("SELECT id, name, phonenumber, notes, created_at FROM leads WHERE gym_id = %s ORDER BY created_at DESC", (current_gym_id,))
     rows = database.cur.fetchall()
     leads = []
     for row in rows:
@@ -44,8 +46,8 @@ def get_leads():
 
 
 @router.delete("/leads/{lead_id}")
-def delete_lead(lead_id: int):
-    database.cur.execute("DELETE FROM leads WHERE id = %s RETURNING id", (lead_id,))
+def delete_lead(lead_id: int, current_gym_id: int = Depends(get_current_gym_id)):
+    database.cur.execute("DELETE FROM leads WHERE id = %s AND gym_id = %s RETURNING id", (lead_id, current_gym_id))
     database.conn.commit()
     if database.cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="Lead not found")

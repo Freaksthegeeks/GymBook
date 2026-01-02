@@ -5,6 +5,9 @@ const { useState, useEffect } = React;
 // API base URL - assuming backend runs on port 8001
 const API_BASE_URL = 'http://localhost:8001';
 
+// Global variable to store current gym
+let currentGym = null;
+
 // Utility function for API calls
 const apiCall = async (endpoint, options = {}) => {
     try {
@@ -43,6 +46,65 @@ const apiCall = async (endpoint, options = {}) => {
         return await response.json();
     } catch (error) {
         console.error(`API call failed for ${endpoint}:`, error);
+        throw error;
+    }
+};
+
+// Function to get user's gyms
+const getUserGyms = async () => {
+    try {
+        return await apiCall('/gyms/');
+    } catch (error) {
+        console.error('Failed to get user gyms:', error);
+        throw error;
+    }
+};
+
+// Function to switch gym
+const switchGym = async (gymId) => {
+    try {
+        const response = await apiCall('/gyms/switch/', {
+            method: 'POST',
+            body: JSON.stringify({ gym_id: gymId })
+        });
+        
+        // Update current gym
+        currentGym = gymId;
+        
+        // Reload the page to refresh data with new gym context
+        window.location.reload();
+        
+        return response;
+    } catch (error) {
+        console.error('Failed to switch gym:', error);
+        throw error;
+    }
+};
+
+// Function to create a new gym
+const createGym = async (gymData) => {
+    try {
+        const response = await apiCall('/gyms/', {
+            method: 'POST',
+            body: JSON.stringify(gymData)
+        });
+        
+        // Reload the page to refresh data
+        window.location.reload();
+        
+        return response;
+    } catch (error) {
+        console.error('Failed to create gym:', error);
+        throw error;
+    }
+};
+
+// Function to get current gym
+const getCurrentGym = async () => {
+    try {
+        return await apiCall('/gyms/current/');
+    } catch (error) {
+        console.error('Failed to get current gym:', error);
         throw error;
     }
 };
@@ -255,6 +317,16 @@ function App() {
     const [dueMembers, setDueMembers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [gyms, setGyms] = useState([]);
+    const [showGymModal, setShowGymModal] = useState(false);
+    const [showCreateGymModal, setShowCreateGymModal] = useState(false);
+    const [gymForm, setGymForm] = useState({
+        name: '',
+        description: '',
+        address: '',
+        phone: '',
+        email: ''
+    });
 
     // Check if user is already logged in
     useEffect(() => {
@@ -326,9 +398,27 @@ function App() {
         }
     };
 
-    // Initial data load when logged in
+    // Load gyms when user logs in
     useEffect(() => {
         if (isLoggedIn) {
+            const loadGyms = async () => {
+                try {
+                    const gymData = await getUserGyms();
+                    setGyms(gymData);
+                    
+                    // Get current gym
+                    try {
+                        const current = await getCurrentGym();
+                        currentGym = current.id;
+                    } catch (err) {
+                        console.error('Could not get current gym:', err);
+                    }
+                } catch (err) {
+                    console.error('Could not load gyms:', err);
+                }
+            };
+            
+            loadGyms();
             fetchData();
         }
     }, [isLoggedIn]);
@@ -363,6 +453,52 @@ function App() {
         setCurrentPage(page);
         if (isLoggedIn) {
             fetchFilteredClients(status);
+        }
+    };
+    
+    // Handle gym form change
+    const handleGymFormChange = (e) => {
+        const { name, value } = e.target;
+        setGymForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+    
+    // Handle create gym
+    const handleCreateGym = async (e) => {
+        e.preventDefault();
+        
+        try {
+            await createGym(gymForm);
+            
+            // Close modal
+            setShowCreateGymModal(false);
+            
+            // Reset form
+            setGymForm({
+                name: '',
+                description: '',
+                address: '',
+                phone: '',
+                email: ''
+            });
+            
+            alert('Gym created successfully!');
+        } catch (err) {
+            alert('Failed to create gym: ' + err.message);
+        }
+    };
+    
+    // Handle switch gym
+    const handleSwitchGym = async (gymId) => {
+        try {
+            await switchGym(gymId);
+            
+            // Close modal
+            setShowGymModal(false);
+        } catch (err) {
+            alert('Failed to switch gym: ' + err.message);
         }
     };
 
@@ -422,19 +558,99 @@ function App() {
 
     return (
         <div>
-            <Navbar onNavigate={handleNavigation} onLogout={handleLogout} currentUser={currentUser} />
+            <Navbar 
+                onNavigate={handleNavigation} 
+                onLogout={handleLogout} 
+                currentUser={currentUser} 
+                gyms={gyms}
+                onSwitchGym={handleSwitchGym}
+                onCreateGym={() => setShowCreateGymModal(true)}
+            />
             <div className="container mt-4">
                 {loading && <div className="alert alert-info">Loading data...</div>}
                 {error && <div className="alert alert-danger">Error: {error}</div>}
                 {renderPage()}
             </div>
             <Footer />
+            
+            {/* Create Gym Modal */}
+            {showCreateGymModal && (
+                <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Create New Gym</h5>
+                                <button type="button" className="btn-close" onClick={() => setShowCreateGymModal(false)}></button>
+                            </div>
+                            <form onSubmit={handleCreateGym}>
+                                <div className="modal-body">
+                                    <div className="mb-3">
+                                        <label className="form-label">Gym Name</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            name="name"
+                                            value={gymForm.name}
+                                            onChange={handleGymFormChange}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Description</label>
+                                        <textarea
+                                            className="form-control"
+                                            name="description"
+                                            value={gymForm.description}
+                                            onChange={handleGymFormChange}
+                                        ></textarea>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Address</label>
+                                        <textarea
+                                            className="form-control"
+                                            name="address"
+                                            value={gymForm.address}
+                                            onChange={handleGymFormChange}
+                                        ></textarea>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Phone</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            name="phone"
+                                            value={gymForm.phone}
+                                            onChange={handleGymFormChange}
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Email</label>
+                                        <input
+                                            type="email"
+                                            className="form-control"
+                                            name="email"
+                                            value={gymForm.email}
+                                            onChange={handleGymFormChange}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowCreateGymModal(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary">Create Gym</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 // Navbar component
-function Navbar({ onNavigate, onLogout, currentUser }) {
+function Navbar({ onNavigate, onLogout, currentUser, gyms, onSwitchGym, onCreateGym }) {
+    const [showGymModal, setShowGymModal] = useState(false);
+    
     return (
         <nav className="navbar navbar-expand-lg navbar-dark">
             <div className="container">
@@ -467,6 +683,39 @@ function Navbar({ onNavigate, onLogout, currentUser }) {
                         </li>
                     </ul>
                     <ul className="navbar-nav">
+                        <li className="nav-item dropdown me-3">
+                            <button className="nav-link btn dropdown-toggle" type="button" id="gymDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                Gym Settings
+                            </button>
+                            <ul className="dropdown-menu" aria-labelledby="gymDropdown">
+                                <li>
+                                    <button className="dropdown-item" onClick={() => onCreateGym()}>
+                                        Create New Gym
+                                    </button>
+                                </li>
+                                <li><hr className="dropdown-divider" /></li>
+                                <li>
+                                    <button className="dropdown-item" onClick={() => setShowGymModal(true)}>
+                                        Switch Gym
+                                    </button>
+                                </li>
+                                {gyms && gyms.length > 0 && (
+                                    <>
+                                        <li><hr className="dropdown-divider" /></li>
+                                        {gyms.map(gym => (
+                                            <li key={gym.id}>
+                                                <button 
+                                                    className="dropdown-item" 
+                                                    onClick={() => onSwitchGym(gym.id)}
+                                                >
+                                                    {gym.name}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </>
+                                )}
+                            </ul>
+                        </li>
                         <li className="nav-item me-3">
                             <span className="navbar-text">
                                 Welcome, {currentUser?.username || 'User'}
@@ -478,6 +727,39 @@ function Navbar({ onNavigate, onLogout, currentUser }) {
                     </ul>
                 </div>
             </div>
+            
+            {/* Switch Gym Modal */}
+            {showGymModal && (
+                <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Switch Gym</h5>
+                                <button type="button" className="btn-close" onClick={() => setShowGymModal(false)}></button>
+                            </div>
+                            <div className="modal-body">
+                                <div className="list-group">
+                                    {gyms && gyms.map(gym => (
+                                        <button 
+                                            key={gym.id}
+                                            className="list-group-item list-group-item-action" 
+                                            onClick={() => {
+                                                onSwitchGym(gym.id);
+                                                setShowGymModal(false);
+                                            }}
+                                        >
+                                            {gym.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowGymModal(false)}>Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </nav>
     );
 }

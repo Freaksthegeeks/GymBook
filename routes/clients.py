@@ -3,6 +3,8 @@ from typing import Optional
 from datetime import date, timedelta
 from pydantic import BaseModel
 from config import database
+from fastapi import HTTPException, Depends
+from index import get_current_user, get_current_gym_id
 
 router = APIRouter()
 
@@ -41,9 +43,9 @@ class RenewalModel(BaseModel):
 
 
 @router.post("/clients/")
-def create_client(client: ClientModel):
+def create_client(client: ClientModel, current_gym_id: int = Depends(get_current_gym_id)):
     try:
-        database.cur.execute("SELECT days, amount FROM plans WHERE id = %s", (client.plan_id,))
+        database.cur.execute("SELECT days, amount FROM plans WHERE id = %s AND gym_id = %s", (client.plan_id, current_gym_id))
         plan = database.cur.fetchone()
         if not plan:
             raise HTTPException(status_code=400, detail="Invalid plan ID")
@@ -56,14 +58,14 @@ def create_client(client: ClientModel):
             INSERT INTO clients
                 (clientname, phonenumber, dateofbirth, gender, bloodgroup,
                  address, notes, email, height, weight,
-                 plan_id, start_date, end_date, balance_due)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 plan_id, start_date, end_date, balance_due, gym_id)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id
         """, (
             client.clientname, client.phonenumber, client.dateofbirth,
             client.gender, client.bloodgroup, client.address, client.notes,
             client.email, client.height, client.weight,
-            client.plan_id, client.start_date, end_date, plan_amount
+            client.plan_id, client.start_date, end_date, plan_amount, current_gym_id
         ))
         database.conn.commit()
         client_id = database.cur.fetchone()[0]
@@ -75,7 +77,7 @@ def create_client(client: ClientModel):
 
 
 @router.get("/clients/")
-def get_clients():
+def get_clients(current_gym_id: int = Depends(get_current_gym_id)):
     database.cur.execute("""
         SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
                c.address, c.notes, c.email, c.height, c.weight,
@@ -83,7 +85,8 @@ def get_clients():
                p.planname, p.days, p.amount
         FROM clients c
         LEFT JOIN plans p ON c.plan_id = p.id
-    """)
+        WHERE c.gym_id = %s
+    """, (current_gym_id,))
     rows = database.cur.fetchall()
     clients = []
     for row in rows:
@@ -135,7 +138,7 @@ def get_clients():
 
 
 @router.get("/clients/birthdays/today")
-def get_birthday_clients():
+def get_birthday_clients(current_gym_id: int = Depends(get_current_gym_id)):
     database.cur.execute("""
         SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
                c.address, c.notes, c.email, c.height, c.weight,
@@ -145,7 +148,8 @@ def get_birthday_clients():
         LEFT JOIN plans p ON c.plan_id = p.id
         WHERE EXTRACT(MONTH FROM c.dateofbirth::date) = EXTRACT(MONTH FROM CURRENT_DATE)
           AND EXTRACT(DAY FROM c.dateofbirth::date) = EXTRACT(DAY FROM CURRENT_DATE)
-    """)
+          AND c.gym_id = %s
+    """, (current_gym_id,))
     rows = database.cur.fetchall()
     clients = []
     for row in rows:
@@ -197,7 +201,7 @@ def get_birthday_clients():
 
 
 @router.get("/clients/{client_id}")
-def get_client(client_id: int):
+def get_client(client_id: int, current_gym_id: int = Depends(get_current_gym_id)):
     database.cur.execute("""
         SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
                c.address, c.notes, c.email, c.height, c.weight,
@@ -205,8 +209,8 @@ def get_client(client_id: int):
                p.planname, p.days, p.amount
         FROM clients c
         JOIN plans p ON c.plan_id = p.id
-        WHERE c.id = %s
-    """, (client_id,))
+        WHERE c.id = %s AND c.gym_id = %s
+    """, (client_id, current_gym_id))
     row = database.cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="client not found")
@@ -235,9 +239,9 @@ def get_client(client_id: int):
 
 
 @router.put("/clients/{client_id}")
-def update_client(client_id: int, client: ClientUpdateModel):
+def update_client(client_id: int, client: ClientUpdateModel, current_gym_id: int = Depends(get_current_gym_id)):
     # Get current client data to preserve plan information
-    database.cur.execute("SELECT plan_id, start_date FROM clients WHERE id = %s", (client_id,))
+    database.cur.execute("SELECT plan_id, start_date FROM clients WHERE id = %s AND gym_id = %s", (client_id, current_gym_id))
     current_client = database.cur.fetchone()
     if not current_client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -246,7 +250,7 @@ def update_client(client_id: int, client: ClientUpdateModel):
     current_start_date = current_client[1]
     
     # Get plan data to calculate end date
-    database.cur.execute("SELECT days FROM plans WHERE id = %s", (current_plan_id,))
+    database.cur.execute("SELECT days FROM plans WHERE id = %s AND gym_id = %s", (current_plan_id, current_gym_id))
     plan = database.cur.fetchone()
     if not plan:
         raise HTTPException(status_code=400, detail="Invalid plan ID")
@@ -266,12 +270,12 @@ def update_client(client_id: int, client: ClientUpdateModel):
         SET clientname = %s, phonenumber = %s, dateofbirth = %s, gender = %s,
             bloodgroup = %s, address = %s, notes = %s, email = %s,
             height = %s, weight = %s, end_date = %s
-        WHERE id = %s
+        WHERE id = %s AND gym_id = %s
         RETURNING id
     """, (
         client.clientname, phone_number, client.dateofbirth, client.gender,
         client.bloodgroup, client.address, client.notes, client.email,
-        client.height, client.weight, end_date, client_id
+        client.height, client.weight, end_date, client_id, current_gym_id
     ))
     
     database.conn.commit()
@@ -281,21 +285,21 @@ def update_client(client_id: int, client: ClientUpdateModel):
 
 
 @router.post("/clients/{client_id}/renew")
-def renew_subscription(client_id: int, renewal: RenewalModel):
+def renew_subscription(client_id: int, renewal: RenewalModel, current_gym_id: int = Depends(get_current_gym_id)):
     try:
         # Get current client data
         database.cur.execute("""
             SELECT c.clientname, c.plan_id, p.amount
             FROM clients c
             LEFT JOIN plans p ON c.plan_id = p.id
-            WHERE c.id = %s
-        """, (client_id,))
+            WHERE c.id = %s AND c.gym_id = %s
+        """, (client_id, current_gym_id))
         client_data = database.cur.fetchone()
         if not client_data:
             raise HTTPException(status_code=404, detail="Client not found")
         
         # Get new plan data
-        database.cur.execute("SELECT days, amount FROM plans WHERE id = %s", (renewal.plan_id,))
+        database.cur.execute("SELECT days, amount FROM plans WHERE id = %s AND gym_id = %s", (renewal.plan_id, current_gym_id))
         plan = database.cur.fetchone()
         if not plan:
             raise HTTPException(status_code=400, detail="Invalid plan ID")
@@ -309,8 +313,8 @@ def renew_subscription(client_id: int, renewal: RenewalModel):
             UPDATE clients
             SET plan_id = %s, start_date = %s, end_date = %s,
                 total_paid = 0, balance_due = %s
-            WHERE id = %s
-        """, (renewal.plan_id, renewal.start_date, end_date, plan_amount, client_id))
+            WHERE id = %s AND gym_id = %s
+        """, (renewal.plan_id, renewal.start_date, end_date, plan_amount, client_id, current_gym_id))
         
         database.conn.commit()
         return {
@@ -327,8 +331,8 @@ def renew_subscription(client_id: int, renewal: RenewalModel):
 
 
 @router.delete("/clients/{client_id}")
-def delete_client(client_id: int):
-    database.cur.execute("DELETE FROM clients WHERE id = %s RETURNING id", (client_id,))
+def delete_client(client_id: int, current_gym_id: int = Depends(get_current_gym_id)):
+    database.cur.execute("DELETE FROM clients WHERE id = %s AND gym_id = %s RETURNING id", (client_id, current_gym_id))
     database.conn.commit()
     if database.cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="client not found")
@@ -336,20 +340,20 @@ def delete_client(client_id: int):
 
 
 @router.get("/clients/filter/")
-def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")):
+def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$"), current_gym_id: int = Depends(get_current_gym_id)):
     if status == "active":
-        query = """
+        query = '''
             SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
                    c.address, c.notes, c.email, c.height, c.weight,
                    c.start_date, c.end_date, c.total_paid, c.balance_due,
                    p.planname, p.days, p.amount
             FROM clients c
             JOIN plans p ON c.plan_id = p.id
-            WHERE c.end_date >= CURRENT_DATE
+            WHERE c.end_date >= CURRENT_DATE AND c.gym_id = %s
             ORDER BY c.end_date
-        """
+        '''
     elif status == "expiring":
-        query = """
+        query = '''
             SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
                    c.address, c.notes, c.email, c.height, c.weight,
                    c.start_date, c.end_date, c.total_paid, c.balance_due,
@@ -357,10 +361,11 @@ def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")
             FROM clients c
             JOIN plans p ON c.plan_id = p.id
             WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '10 days'
+                AND c.gym_id = %s
             ORDER BY c.end_date
-        """
+        '''
     elif status == "expired":
-        query = """
+        query = '''
                 SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
                              c.address, c.notes, c.email, c.height, c.weight,
                              c.start_date, c.end_date, c.total_paid, c.balance_due,
@@ -369,12 +374,13 @@ def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$")
                 JOIN plans p ON c.plan_id = p.id
                 WHERE c.end_date < CURRENT_DATE
                     AND c.end_date >= CURRENT_DATE - INTERVAL '30 days'
+                    AND c.gym_id = %s
                 ORDER BY c.end_date
-        """
+        '''
     else:
         raise HTTPException(status_code=400, detail="Invalid status")
 
-    database.cur.execute(query)
+    database.cur.execute(query, (current_gym_id,))
     rows = database.cur.fetchall()
     clients = []
     for row in rows:
