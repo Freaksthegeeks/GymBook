@@ -71,6 +71,11 @@ const switchGym = async (gymId) => {
         // Update current gym
         currentGym = gymId;
         
+        // If a new access token is returned, update it in localStorage
+        if (response.new_access_token) {
+            localStorage.setItem('token', response.new_access_token);
+        }
+        
         // Reload the page to refresh data with new gym context
         window.location.reload();
         
@@ -89,12 +94,41 @@ const createGym = async (gymData) => {
             body: JSON.stringify(gymData)
         });
         
-        // Reload the page to refresh data
-        window.location.reload();
+        // Get the newly created gym ID
+        const newGymId = response.gym_id;
+        
+        // Switch to the new gym to update the token
+        await switchGymDirectly(newGymId);
         
         return response;
     } catch (error) {
         console.error('Failed to create gym:', error);
+        throw error;
+    }
+};
+
+// Function to switch gym directly without reloading
+const switchGymDirectly = async (gymId) => {
+    try {
+        // Call the backend to switch gym and get updated token
+        const response = await apiCall('/gyms/switch/', {
+            method: 'POST',
+            body: JSON.stringify({ gym_id: gymId })
+        });
+        
+        // Update current gym in global variable
+        currentGym = gymId;
+        
+        // If a new access token is returned, update it in localStorage
+        if (response.new_access_token) {
+            localStorage.setItem('token', response.new_access_token);
+        }
+        
+        // Reload the page to refresh data with new gym context
+        window.location.reload();
+        
+    } catch (error) {
+        console.error('Failed to switch gym:', error);
         throw error;
     }
 };
@@ -298,6 +332,7 @@ function Login({ onLogin }) {
 function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
+    const [onboardingStep, setOnboardingStep] = useState(0); // 0: not started, 1: welcome, 2: create gym, 3: dashboard
     const [currentPage, setCurrentPage] = useState('dashboard');
     const [clients, setClients] = useState([]);
     const [plans, setPlans] = useState([]);
@@ -340,8 +375,41 @@ function App() {
                 username,
                 user_id: userId
             });
+            
+            // Check if user has gyms to determine onboarding step
+            checkUserGyms();
         }
     }, []);
+    
+    // Check if user has gyms to determine onboarding step
+    const checkUserGyms = async () => {
+        try {
+            const gymData = await getUserGyms();
+            
+            if (gymData && gymData.length === 0) {
+                // User has no gyms, start onboarding
+                setOnboardingStep(1); // Show welcome message
+            } else {
+                // User has gyms, go to dashboard
+                setGyms(gymData);
+                setOnboardingStep(3); // Go to dashboard
+                
+                // Get current gym
+                try {
+                    const current = await getCurrentGym();
+                    currentGym = current.id;
+                } catch (err) {
+                    console.error('Could not get current gym:', err);
+                }
+                
+                // Fetch dashboard data
+                fetchData();
+            }
+        } catch (err) {
+            console.error('Could not check user gyms:', err);
+            setError('Could not load gym information');
+        }
+    };
 
     // Fetch data from the backend API
     const fetchData = async () => {
@@ -400,26 +468,8 @@ function App() {
 
     // Load gyms when user logs in
     useEffect(() => {
-        if (isLoggedIn) {
-            const loadGyms = async () => {
-                try {
-                    const gymData = await getUserGyms();
-                    setGyms(gymData);
-                    
-                    // Get current gym
-                    try {
-                        const current = await getCurrentGym();
-                        currentGym = current.id;
-                    } catch (err) {
-                        console.error('Could not get current gym:', err);
-                    }
-                } catch (err) {
-                    console.error('Could not load gyms:', err);
-                }
-            };
-            
-            loadGyms();
-            fetchData();
+        if (isLoggedIn && onboardingStep === 0) {
+            checkUserGyms();
         }
     }, [isLoggedIn]);
 
@@ -556,6 +606,166 @@ function App() {
         }
     };
 
+    // Render onboarding screens
+    const renderOnboarding = () => {
+        if (onboardingStep === 1) { // Welcome screen
+            return (
+                <div className="container d-flex align-items-center justify-content-center" style={{ minHeight: '80vh' }}>
+                    <div className="text-center">
+                        <h1 className="display-4 mb-4">Welcome to GymEdge!</h1>
+                        <p className="lead mb-4">
+                            GymEdge is a comprehensive gym management system that helps you manage clients, staff, plans, payments, and more.
+                        </p>
+                        <div className="mb-4">
+                            <div className="row">
+                                <div className="col-md-4">
+                                    <div className="card h-100">
+                                        <div className="card-body">
+                                            <h5 className="card-title">Manage Clients</h5>
+                                            <p className="card-text">Track client information, memberships, and health metrics</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-md-4">
+                                    <div className="card h-100">
+                                        <div className="card-body">
+                                            <h5 className="card-title">Staff Management</h5>
+                                            <p className="card-text">Keep track of your team members and their roles</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-md-4">
+                                    <div className="card h-100">
+                                        <div className="card-body">
+                                            <h5 className="card-title">Payment Tracking</h5>
+                                            <p className="card-text">Monitor payments and outstanding balances</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button 
+                            className="btn btn-primary btn-lg"
+                            onClick={() => setOnboardingStep(2)}
+                        >
+                            Get Started
+                        </button>
+                    </div>
+                </div>
+            );
+        } else if (onboardingStep === 2) { // Create gym screen
+            return (
+                <div className="container d-flex align-items-center justify-content-center" style={{ minHeight: '80vh' }}>
+                    <div className="col-md-6">
+                        <div className="card">
+                            <div className="card-header">
+                                <h3 className="text-center">Create Your First Gym</h3>
+                            </div>
+                            <div className="card-body">
+                                <form onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    try {
+                                        await createGym(gymForm);
+                                        alert('Gym created successfully!');
+                                        
+                                        // Reload gyms and go to dashboard
+                                        const gymData = await getUserGyms();
+                                        setGyms(gymData);
+                                        
+                                        // Get current gym
+                                        try {
+                                            const current = await getCurrentGym();
+                                            currentGym = current.id;
+                                        } catch (err) {
+                                            console.error('Could not get current gym:', err);
+                                        }
+                                        
+                                        setOnboardingStep(3); // Go to dashboard
+                                        fetchData();
+                                    } catch (err) {
+                                        alert('Failed to create gym: ' + err.message);
+                                    }
+                                }}>
+                                    <div className="mb-3">
+                                        <label className="form-label">Gym Name *</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            name="name"
+                                            value={gymForm.name}
+                                            onChange={handleGymFormChange}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Description</label>
+                                        <textarea
+                                            className="form-control"
+                                            name="description"
+                                            value={gymForm.description}
+                                            onChange={handleGymFormChange}
+                                        ></textarea>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Address</label>
+                                        <textarea
+                                            className="form-control"
+                                            name="address"
+                                            value={gymForm.address}
+                                            onChange={handleGymFormChange}
+                                        ></textarea>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Phone</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            name="phone"
+                                            value={gymForm.phone}
+                                            onChange={handleGymFormChange}
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Email</label>
+                                        <input
+                                            type="email"
+                                            className="form-control"
+                                            name="email"
+                                            value={gymForm.email}
+                                            onChange={handleGymFormChange}
+                                        />
+                                    </div>
+                                    <div className="d-grid gap-2">
+                                        <button type="submit" className="btn btn-primary">Create Gym</button>
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-outline-secondary"
+                                            onClick={() => setOnboardingStep(1)}
+                                        >
+                                            Back
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        return null; // For other onboarding steps, we'll return the normal layout
+    };
+    
+    // If in onboarding, show onboarding screens
+    if (onboardingStep === 1 || onboardingStep === 2) {
+        return (
+            <div>
+                {renderOnboarding()}
+            </div>
+        );
+    }
+    
+    // Normal app layout for dashboard
     return (
         <div>
             <Navbar 
@@ -564,7 +774,10 @@ function App() {
                 currentUser={currentUser} 
                 gyms={gyms}
                 onSwitchGym={handleSwitchGym}
-                onCreateGym={() => setShowCreateGymModal(true)}
+                onCreateGym={() => {
+                    // If we're in onboarding flow, just show create gym modal
+                    setShowCreateGymModal(true);
+                }}
             />
             <div className="container mt-4">
                 {loading && <div className="alert alert-info">Loading data...</div>}

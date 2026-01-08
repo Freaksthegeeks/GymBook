@@ -5,7 +5,8 @@ from typing import List
 import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime
-from index import get_current_user, SECRET_KEY, ALGORITHM
+from index import get_current_user, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_access_token
+from datetime import timedelta
 
 router = APIRouter()
 
@@ -109,13 +110,24 @@ def switch_gym(gym_switch: GymSwitch, credentials: HTTPAuthorizationCredentials 
         if database.cur.fetchone()[0] == 0:
             raise HTTPException(status_code=403, detail="You don't have access to this gym")
         
-        # Update the token with the new current gym
-        # In a real implementation, we'd return a new token with updated gym context
-        # For now, we'll just return success and the frontend will handle the context
+        # Create a new token with the updated current gym ID
+        new_payload = {
+            "sub": user_id,
+            "username": payload.get("username"),
+            "current_gym_id": gym_id
+        }
+        
+        # Create new access token with updated gym context
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        new_access_token = create_access_token(
+            data=new_payload,
+            expires_delta=access_token_expires
+        )
         
         return {
             "message": "Gym switched successfully",
-            "gym_id": gym_id
+            "gym_id": gym_id,
+            "new_access_token": new_access_token
         }
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -154,8 +166,10 @@ def get_current_gym(current_user: dict = Depends(get_current_user)):
             address=gym_data[3],
             phone=gym_data[4],
             email=gym_data[5],
-            created_at=str(gym_data[6]),
-            updated_at=str(gym_data[7])
+            created_at=str(gym_data[6]) if gym_data[6] else None,
+            updated_at=str(gym_data[7]) if gym_data[7] else None
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get current gym: {str(e)}")

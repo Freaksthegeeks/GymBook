@@ -31,18 +31,22 @@ def create_lead(lead: LeadModel, current_gym_id: int = Depends(get_current_gym_i
 
 @router.get("/leads/")
 def get_leads(current_gym_id: int = Depends(get_current_gym_id)):
-    database.cur.execute("SELECT id, name, phonenumber, notes, created_at FROM leads WHERE gym_id = %s ORDER BY created_at DESC", (current_gym_id,))
-    rows = database.cur.fetchall()
-    leads = []
-    for row in rows:
-        leads.append({
-            "id": row[0],
-            "name": row[1],
-            "phonenumber": str(row[2]),
-            "notes": row[3],
-            "created_at": str(row[4]) if row[4] else None,
-        })
-    return {"leads": leads}
+    try:
+        database.cur.execute("SELECT id, name, phonenumber, notes, created_at FROM leads WHERE gym_id = %s ORDER BY created_at DESC", (current_gym_id,))
+        rows = database.cur.fetchall()
+        leads = []
+        for row in rows:
+            leads.append({
+                "id": row[0],
+                "name": row[1],
+                "phonenumber": str(row[2]),
+                "notes": row[3],
+                "created_at": str(row[4]) if row[4] else None,
+            })
+        return {"leads": leads}
+    except Exception as e:
+        # Handle case where there are no results to fetch
+        return {"leads": []}
 
 
 @router.delete("/leads/{lead_id}")

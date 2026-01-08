@@ -78,164 +78,182 @@ def create_client(client: ClientModel, current_gym_id: int = Depends(get_current
 
 @router.get("/clients/")
 def get_clients(current_gym_id: int = Depends(get_current_gym_id)):
-    database.cur.execute("""
-        SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
-               c.address, c.notes, c.email, c.height, c.weight,
-               c.start_date, c.end_date, c.total_paid, c.balance_due,
-               p.planname, p.days, p.amount
-        FROM clients c
-        LEFT JOIN plans p ON c.plan_id = p.id
-        WHERE c.gym_id = %s
-    """, (current_gym_id,))
-    rows = database.cur.fetchall()
-    clients = []
-    for row in rows:
-        # Ensure we have enough elements in the row
-        if len(row) >= 18:
-            clients.append({
-                "id": row[0] if row[0] is not None else 0,
-                "clientname": row[1] if row[1] else "",
-                "phonenumber": str(row[2]) if row[2] else "",
-                "dateofbirth": str(row[3]) if row[3] else None,
-                "gender": row[4] if row[4] else "",
-                "bloodgroup": row[5] if row[5] else "",
-                "address": row[6] if row[6] else "",
-                "notes": row[7] if row[7] else "",
-                "email": row[8] if row[8] else "",
-                "height": float(row[9]) if row[9] is not None else 0.0,
-                "weight": float(row[10]) if row[10] is not None else 0.0,
-                "start_date": str(row[11]) if row[11] else None,
-                "end_date": str(row[12]) if row[12] else None,
-                "total_paid": float(row[13]) if row[13] is not None else 0.0,
-                "balance_due": float(row[14]) if row[14] is not None else 0.0,
-                "planname": row[15] if row[15] else "",
-                "days": row[16] if row[16] is not None else 0,
-                "amount": float(row[17]) if row[17] is not None else 0.0,
-            })
-        else:
-            # Handle case where row doesn't have enough elements
-            clients.append({
-                "id": row[0] if len(row) > 0 and row[0] is not None else 0,
-                "clientname": row[1] if len(row) > 1 and row[1] else "",
-                "phonenumber": str(row[2]) if len(row) > 2 and row[2] else "",
-                "dateofbirth": str(row[3]) if len(row) > 3 and row[3] else None,
-                "gender": row[4] if len(row) > 4 and row[4] else "",
-                "bloodgroup": row[5] if len(row) > 5 and row[5] else "",
-                "address": row[6] if len(row) > 6 and row[6] else "",
-                "notes": row[7] if len(row) > 7 and row[7] else "",
-                "email": row[8] if len(row) > 8 and row[8] else "",
-                "height": float(row[9]) if len(row) > 9 and row[9] is not None else 0.0,
-                "weight": float(row[10]) if len(row) > 10 and row[10] is not None else 0.0,
-                "start_date": str(row[11]) if len(row) > 11 and row[11] else None,
-                "end_date": str(row[12]) if len(row) > 12 and row[12] else None,
-                "total_paid": float(row[13]) if len(row) > 13 and row[13] is not None else 0.0,
-                "balance_due": float(row[14]) if len(row) > 14 and row[14] is not None else 0.0,
-                "planname": row[15] if len(row) > 15 and row[15] else "",
-                "days": row[16] if len(row) > 16 and row[16] is not None else 0,
-                "amount": float(row[17]) if len(row) > 17 and row[17] is not None else 0.0,
-            })
-    return {"clients": clients}
+    try:
+        database.cur.execute("""
+            SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+                   c.address, c.notes, c.email, c.height, c.weight,
+                   c.start_date, c.end_date, c.total_paid, c.balance_due,
+                   p.planname, p.days, p.amount
+            FROM clients c
+            LEFT JOIN plans p ON c.plan_id = p.id
+            WHERE c.gym_id = %s
+        """, (current_gym_id,))
+        rows = database.cur.fetchall() if database.cur.rowcount != -1 else []
+        clients = []
+        for row in rows:
+            # Ensure we have enough elements in the row
+            if len(row) >= 18:
+                clients.append({
+                    "id": row[0] if row[0] is not None else 0,
+                    "clientname": row[1] if row[1] else "",
+                    "phonenumber": str(row[2]) if row[2] else "",
+                    "dateofbirth": str(row[3]) if row[3] else None,
+                    "gender": row[4] if row[4] else "",
+                    "bloodgroup": row[5] if row[5] else "",
+                    "address": row[6] if row[6] else "",
+                    "notes": row[7] if row[7] else "",
+                    "email": row[8] if row[8] else "",
+                    "height": float(row[9]) if row[9] is not None and str(row[9]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "weight": float(row[10]) if row[10] is not None and str(row[10]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "start_date": str(row[11]) if row[11] else None,
+                    "end_date": str(row[12]) if row[12] else None,
+                    "total_paid": float(row[13]) if row[13] is not None and str(row[13]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "balance_due": float(row[14]) if row[14] is not None and str(row[14]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "planname": row[15] if row[15] else "",
+                    "days": row[16] if row[16] is not None else 0,
+                    "amount": float(row[17]) if row[17] is not None and str(row[17]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                })
+            else:
+                # Handle case where row doesn't have enough elements
+                clients.append({
+                    "id": row[0] if len(row) > 0 and row[0] is not None else 0,
+                    "clientname": row[1] if len(row) > 1 and row[1] else "",
+                    "phonenumber": str(row[2]) if len(row) > 2 and row[2] else "",
+                    "dateofbirth": str(row[3]) if len(row) > 3 and row[3] else None,
+                    "gender": row[4] if len(row) > 4 and row[4] else "",
+                    "bloodgroup": row[5] if len(row) > 5 and row[5] else "",
+                    "address": row[6] if len(row) > 6 and row[6] else "",
+                    "notes": row[7] if len(row) > 7 and row[7] else "",
+                    "email": row[8] if len(row) > 8 and row[8] else "",
+                    "height": float(row[9]) if len(row) > 9 and row[9] is not None and str(row[9]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "weight": float(row[10]) if len(row) > 10 and row[10] is not None and str(row[10]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "start_date": str(row[11]) if len(row) > 11 and row[11] else None,
+                    "end_date": str(row[12]) if len(row) > 12 and row[12] else None,
+                    "total_paid": float(row[13]) if len(row) > 13 and row[13] is not None and str(row[13]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "balance_due": float(row[14]) if len(row) > 14 and row[14] is not None and str(row[14]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "planname": row[15] if len(row) > 15 and row[15] else "",
+                    "days": row[16] if len(row) > 16 and row[16] is not None else 0,
+                    "amount": float(row[17]) if len(row) > 17 and row[17] is not None and str(row[17]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                })
+        return {"clients": clients}
+    except Exception as e:
+        print(f"Error in get_clients: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"clients": []}
 
 
 @router.get("/clients/birthdays/today")
 def get_birthday_clients(current_gym_id: int = Depends(get_current_gym_id)):
-    database.cur.execute("""
-        SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
-               c.address, c.notes, c.email, c.height, c.weight,
-               c.start_date, c.end_date, c.total_paid, c.balance_due,
-               p.planname, p.days, p.amount
-        FROM clients c
-        LEFT JOIN plans p ON c.plan_id = p.id
-        WHERE EXTRACT(MONTH FROM c.dateofbirth::date) = EXTRACT(MONTH FROM CURRENT_DATE)
-          AND EXTRACT(DAY FROM c.dateofbirth::date) = EXTRACT(DAY FROM CURRENT_DATE)
-          AND c.gym_id = %s
-    """, (current_gym_id,))
-    rows = database.cur.fetchall()
-    clients = []
-    for row in rows:
-        # Ensure we have enough elements in the row
-        if len(row) >= 18:
-            clients.append({
-                "id": row[0] if row[0] is not None else 0,
-                "clientname": row[1] if row[1] else "",
-                "phonenumber": str(row[2]) if row[2] else "",
-                "dateofbirth": str(row[3]) if row[3] else None,
-                "gender": row[4] if row[4] else "",
-                "bloodgroup": row[5] if row[5] else "",
-                "address": row[6] if row[6] else "",
-                "notes": row[7] if row[7] else "",
-                "email": row[8] if row[8] else "",
-                "height": float(row[9]) if row[9] is not None else 0.0,
-                "weight": float(row[10]) if row[10] is not None else 0.0,
-                "start_date": str(row[11]) if row[11] else None,
-                "end_date": str(row[12]) if row[12] else None,
-                "total_paid": float(row[13]) if row[13] is not None else 0.0,
-                "balance_due": float(row[14]) if row[14] is not None else 0.0,
-                "planname": row[15] if row[15] else "",
-                "days": row[16] if row[16] is not None else 0,
-                "amount": float(row[17]) if row[17] is not None else 0.0,
-            })
-        else:
-            # Handle case where row doesn't have enough elements
-            clients.append({
-                "id": row[0] if len(row) > 0 and row[0] is not None else 0,
-                "clientname": row[1] if len(row) > 1 and row[1] else "",
-                "phonenumber": str(row[2]) if len(row) > 2 and row[2] else "",
-                "dateofbirth": str(row[3]) if len(row) > 3 and row[3] else None,
-                "gender": row[4] if len(row) > 4 and row[4] else "",
-                "bloodgroup": row[5] if len(row) > 5 and row[5] else "",
-                "address": row[6] if len(row) > 6 and row[6] else "",
-                "notes": row[7] if len(row) > 7 and row[7] else "",
-                "email": row[8] if len(row) > 8 and row[8] else "",
-                "height": float(row[9]) if len(row) > 9 and row[9] is not None else 0.0,
-                "weight": float(row[10]) if len(row) > 10 and row[10] is not None else 0.0,
-                "start_date": str(row[11]) if len(row) > 11 and row[11] else None,
-                "end_date": str(row[12]) if len(row) > 12 and row[12] else None,
-                "total_paid": float(row[13]) if len(row) > 13 and row[13] is not None else 0.0,
-                "balance_due": float(row[14]) if len(row) > 14 and row[14] is not None else 0.0,
-                "planname": row[15] if len(row) > 15 and row[15] else "",
-                "days": row[16] if len(row) > 16 and row[16] is not None else 0,
-                "amount": float(row[17]) if len(row) > 17 and row[17] is not None else 0.0,
-            })
-    return {"clients": clients}
+    try:
+        database.cur.execute("""
+            SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+                   c.address, c.notes, c.email, c.height, c.weight,
+                   c.start_date, c.end_date, c.total_paid, c.balance_due,
+                   p.planname, p.days, p.amount
+            FROM clients c
+            LEFT JOIN plans p ON c.plan_id = p.id
+            WHERE EXTRACT(MONTH FROM c.dateofbirth::date) = EXTRACT(MONTH FROM CURRENT_DATE)
+              AND EXTRACT(DAY FROM c.dateofbirth::date) = EXTRACT(DAY FROM CURRENT_DATE)
+              AND c.gym_id = %s
+        """, (current_gym_id,))
+        rows = database.cur.fetchall() if database.cur.rowcount != -1 else []
+        clients = []
+        for row in rows:
+            # Ensure we have enough elements in the row
+            if len(row) >= 18:
+                clients.append({
+                    "id": row[0] if row[0] is not None else 0,
+                    "clientname": row[1] if row[1] else "",
+                    "phonenumber": str(row[2]) if row[2] else "",
+                    "dateofbirth": str(row[3]) if row[3] else None,
+                    "gender": row[4] if row[4] else "",
+                    "bloodgroup": row[5] if row[5] else "",
+                    "address": row[6] if row[6] else "",
+                    "notes": row[7] if row[7] else "",
+                    "email": row[8] if row[8] else "",
+                    "height": float(row[9]) if row[9] is not None and str(row[9]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "weight": float(row[10]) if row[10] is not None and str(row[10]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "start_date": str(row[11]) if row[11] else None,
+                    "end_date": str(row[12]) if row[12] else None,
+                    "total_paid": float(row[13]) if row[13] is not None and str(row[13]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "balance_due": float(row[14]) if row[14] is not None and str(row[14]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "planname": row[15] if row[15] else "",
+                    "days": row[16] if row[16] is not None else 0,
+                    "amount": float(row[17]) if row[17] is not None and str(row[17]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                })
+            else:
+                # Handle case where row doesn't have enough elements
+                clients.append({
+                    "id": row[0] if len(row) > 0 and row[0] is not None else 0,
+                    "clientname": row[1] if len(row) > 1 and row[1] else "",
+                    "phonenumber": str(row[2]) if len(row) > 2 and row[2] else "",
+                    "dateofbirth": str(row[3]) if len(row) > 3 and row[3] else None,
+                    "gender": row[4] if len(row) > 4 and row[4] else "",
+                    "bloodgroup": row[5] if len(row) > 5 and row[5] else "",
+                    "address": row[6] if len(row) > 6 and row[6] else "",
+                    "notes": row[7] if len(row) > 7 and row[7] else "",
+                    "email": row[8] if len(row) > 8 and row[8] else "",
+                    "height": float(row[9]) if len(row) > 9 and row[9] is not None and str(row[9]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "weight": float(row[10]) if len(row) > 10 and row[10] is not None and str(row[10]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "start_date": str(row[11]) if len(row) > 11 and row[11] else None,
+                    "end_date": str(row[12]) if len(row) > 12 and row[12] else None,
+                    "total_paid": float(row[13]) if len(row) > 13 and row[13] is not None and str(row[13]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "balance_due": float(row[14]) if len(row) > 14 and row[14] is not None and str(row[14]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                    "planname": row[15] if len(row) > 15 and row[15] else "",
+                    "days": row[16] if len(row) > 16 and row[16] is not None else 0,
+                    "amount": float(row[17]) if len(row) > 17 and row[17] is not None and str(row[17]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                })
+        return {"clients": clients}
+    except Exception as e:
+        print(f"Error in get_birthday_clients: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"clients": []}
 
 
 @router.get("/clients/{client_id}")
 def get_client(client_id: int, current_gym_id: int = Depends(get_current_gym_id)):
-    database.cur.execute("""
-        SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
-               c.address, c.notes, c.email, c.height, c.weight,
-               c.start_date, c.end_date, c.total_paid, c.balance_due,
-               p.planname, p.days, p.amount
-        FROM clients c
-        JOIN plans p ON c.plan_id = p.id
-        WHERE c.id = %s AND c.gym_id = %s
-    """, (client_id, current_gym_id))
-    row = database.cur.fetchone()
-    if not row:
+    try:
+        database.cur.execute("""
+            SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+                   c.address, c.notes, c.email, c.height, c.weight,
+                   c.start_date, c.end_date, c.total_paid, c.balance_due,
+                   p.planname, p.days, p.amount
+            FROM clients c
+            JOIN plans p ON c.plan_id = p.id
+            WHERE c.id = %s AND c.gym_id = %s
+        """, (client_id, current_gym_id))
+        row = database.cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="client not found")
+            
+        client = {
+            "id": row[0] if row[0] is not None else 0,
+            "clientname": row[1] if row[1] else "",
+            "phonenumber": str(row[2]) if row[2] else "",
+            "dateofbirth": str(row[3]) if row[3] else None,
+            "gender": row[4] if row[4] else "",
+            "bloodgroup": row[5] if row[5] else "",
+            "address": row[6] if row[6] else "",
+            "notes": row[7] if row[7] else "",
+            "email": row[8] if row[8] else "",
+            "height": float(row[9]) if row[9] is not None and str(row[9]).replace('.', '').replace('-', '').isdigit() else 0.0,
+            "weight": float(row[10]) if row[10] is not None and str(row[10]).replace('.', '').replace('-', '').isdigit() else 0.0,
+            "start_date": str(row[11]) if row[11] else None,
+            "end_date": str(row[12]) if row[12] else None,
+            "total_paid": float(row[13]) if row[13] is not None and str(row[13]).replace('.', '').replace('-', '').isdigit() else 0.0,
+            "balance_due": float(row[14]) if row[14] is not None and str(row[14]).replace('.', '').replace('-', '').isdigit() else 0.0,
+            "planname": row[15] if row[15] else "",
+            "days": row[16] if row[16] is not None else 0,
+            "amount": float(row[17]) if row[17] is not None and str(row[17]).replace('.', '').replace('-', '').isdigit() else 0.0,
+        }
+        return {"client": client}
+    except Exception as e:
+        print(f"Error in get_client: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=404, detail="client not found")
-        
-    client = {
-        "id": row[0],
-        "clientname": row[1],
-        "phonenumber": str(row[2]),
-        "dateofbirth": str(row[3]),
-        "gender": row[4],
-        "bloodgroup": row[5],
-        "address": row[6],
-        "notes": row[7],
-        "email": row[8],
-        "height": float(row[9]),
-        "weight": float(row[10]),
-        "start_date": str(row[11]),
-        "end_date": str(row[12]) if row[12] else None,
-        "total_paid": float(row[13]) if row[13] else 0.0,
-        "balance_due": float(row[14]) if row[14] else 0.0,
-        "planname": row[15],
-        "days": row[16],
-        "amount": float(row[17]) if row[17] else None,
-    }
-    return {"client": client}
 
 
 @router.put("/clients/{client_id}")
@@ -341,67 +359,73 @@ def delete_client(client_id: int, current_gym_id: int = Depends(get_current_gym_
 
 @router.get("/clients/filter/")
 def filter_clients(status: str = Query(..., regex="^(active|expiring|expired)$"), current_gym_id: int = Depends(get_current_gym_id)):
-    if status == "active":
-        query = '''
-            SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
-                   c.address, c.notes, c.email, c.height, c.weight,
-                   c.start_date, c.end_date, c.total_paid, c.balance_due,
-                   p.planname, p.days, p.amount
-            FROM clients c
-            JOIN plans p ON c.plan_id = p.id
-            WHERE c.end_date >= CURRENT_DATE AND c.gym_id = %s
-            ORDER BY c.end_date
-        '''
-    elif status == "expiring":
-        query = '''
-            SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
-                   c.address, c.notes, c.email, c.height, c.weight,
-                   c.start_date, c.end_date, c.total_paid, c.balance_due,
-                   p.planname, p.days, p.amount
-            FROM clients c
-            JOIN plans p ON c.plan_id = p.id
-            WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '10 days'
-                AND c.gym_id = %s
-            ORDER BY c.end_date
-        '''
-    elif status == "expired":
-        query = '''
+    try:
+        if status == "active":
+            query = '''
                 SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
-                             c.address, c.notes, c.email, c.height, c.weight,
-                             c.start_date, c.end_date, c.total_paid, c.balance_due,
-                             p.planname, p.days, p.amount
+                       c.address, c.notes, c.email, c.height, c.weight,
+                       c.start_date, c.end_date, c.total_paid, c.balance_due,
+                       p.planname, p.days, p.amount
                 FROM clients c
                 JOIN plans p ON c.plan_id = p.id
-                WHERE c.end_date < CURRENT_DATE
-                    AND c.end_date >= CURRENT_DATE - INTERVAL '30 days'
+                WHERE c.end_date >= CURRENT_DATE AND c.gym_id = %s
+                ORDER BY c.end_date
+            '''
+        elif status == "expiring":
+            query = '''
+                SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+                       c.address, c.notes, c.email, c.height, c.weight,
+                       c.start_date, c.end_date, c.total_paid, c.balance_due,
+                       p.planname, p.days, p.amount
+                FROM clients c
+                JOIN plans p ON c.plan_id = p.id
+                WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '10 days'
                     AND c.gym_id = %s
                 ORDER BY c.end_date
-        '''
-    else:
-        raise HTTPException(status_code=400, detail="Invalid status")
+            '''
+        elif status == "expired":
+            query = '''
+                    SELECT c.id, c.clientname, c.phonenumber, c.dateofbirth, c.gender, c.bloodgroup,
+                                 c.address, c.notes, c.email, c.height, c.weight,
+                                 c.start_date, c.end_date, c.total_paid, c.balance_due,
+                                 p.planname, p.days, p.amount
+                    FROM clients c
+                    JOIN plans p ON c.plan_id = p.id
+                    WHERE c.end_date < CURRENT_DATE
+                        AND c.end_date >= CURRENT_DATE - INTERVAL '30 days'
+                        AND c.gym_id = %s
+                    ORDER BY c.end_date
+            '''
+        else:
+            raise HTTPException(status_code=400, detail="Invalid status")
 
-    database.cur.execute(query, (current_gym_id,))
-    rows = database.cur.fetchall()
-    clients = []
-    for row in rows:
-        clients.append({
-            "id": row[0],
-            "clientname": row[1],
-            "phonenumber": str(row[2]),
-            "dateofbirth": str(row[3]) if row[3] else None,
-            "gender": row[4],
-            "bloodgroup": row[5],
-            "address": row[6],
-            "notes": row[7],
-            "email": row[8],
-            "height": float(row[9]) if row[9] else None,
-            "weight": float(row[10]) if row[10] else None,
-            "start_date": str(row[11]),
-            "end_date": str(row[12]) if row[12] else None,
-            "total_paid": float(row[13]) if row[13] else 0.0,
-            "balance_due": float(row[14]) if row[14] else 0.0,
-            "planname": row[15],
-            "days": row[16],
-            "amount": float(row[17]) if row[17] else None,
-        })
-    return {"status": status, "clients": clients}
+        database.cur.execute(query, (current_gym_id,))
+        rows = database.cur.fetchall() if database.cur.rowcount != -1 else []
+        clients = []
+        for row in rows:
+            clients.append({
+                "id": row[0] if row[0] is not None else 0,
+                "clientname": row[1] if row[1] else "",
+                "phonenumber": str(row[2]) if row[2] else "",
+                "dateofbirth": str(row[3]) if row[3] else None,
+                "gender": row[4] if row[4] else "",
+                "bloodgroup": row[5] if row[5] else "",
+                "address": row[6] if row[6] else "",
+                "notes": row[7] if row[7] else "",
+                "email": row[8] if row[8] else "",
+                "height": float(row[9]) if row[9] is not None and str(row[9]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                "weight": float(row[10]) if row[10] is not None and str(row[10]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                "start_date": str(row[11]) if row[11] else None,
+                "end_date": str(row[12]) if row[12] else None,
+                "total_paid": float(row[13]) if row[13] is not None and str(row[13]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                "balance_due": float(row[14]) if row[14] is not None and str(row[14]).replace('.', '').replace('-', '').isdigit() else 0.0,
+                "planname": row[15] if row[15] else "",
+                "days": row[16] if row[16] is not None else 0,
+                "amount": float(row[17]) if row[17] is not None and str(row[17]).replace('.', '').replace('-', '').isdigit() else 0.0,
+            })
+        return {"status": status, "clients": clients}
+    except Exception as e:
+        print(f"Error in filter_clients: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"status": status, "clients": []}

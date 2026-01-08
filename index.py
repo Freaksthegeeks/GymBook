@@ -105,6 +105,11 @@ def get_current_gym_id(credentials: HTTPAuthorizationCredentials = Depends(secur
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         current_gym_id: int = payload.get("current_gym_id")
+        if current_gym_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No gym selected. Please select a gym first."
+            )
         return current_gym_id
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -145,24 +150,6 @@ def register_user(user: UserRegister):
         """, (user.username, user.email, hashed_password))
 
         user_id = database.cur.fetchone()[0]
-        database.conn.commit()
-        
-        # Create a default gym for the new user
-        gym_name = f"{user.username}'s Gym"
-        database.cur.execute("""
-            INSERT INTO gyms (name, description)
-            VALUES (%s, %s)
-            RETURNING id
-        """, (gym_name, f"Default gym for {user.username}"))
-        
-        gym_id = database.cur.fetchone()[0]
-        
-        # Add user to their default gym as owner
-        database.cur.execute("""
-            INSERT INTO user_gyms (user_id, gym_id, role, is_owner)
-            VALUES (%s, %s, %s, %s)
-        """, (user_id, gym_id, 'admin', True))
-        
         database.conn.commit()
 
         return {"message": "User registered successfully", "user_id": user_id}
@@ -210,25 +197,15 @@ def login_user(user: UserLogin):
         gym_result = database.cur.fetchone()
         current_gym_id = gym_result[0] if gym_result else None
         
-        # If user has no gym, create a default one
+        # If user has no gyms, return a special response to indicate onboarding
         if current_gym_id is None:
-            gym_name = f"{username}'s Gym"
-            database.cur.execute("""
-                INSERT INTO gyms (name, description)
-                VALUES (%s, %s)
-                RETURNING id
-            """, (gym_name, f"Default gym for {username}"))
-            
-            new_gym_id = database.cur.fetchone()[0]
-            
-            # Add user to their default gym as owner
-            database.cur.execute("""
-                INSERT INTO user_gyms (user_id, gym_id, role, is_owner)
-                VALUES (%s, %s, %s, %s)
-            """, (user_id, new_gym_id, 'admin', True))
-            
-            current_gym_id = new_gym_id
-
+            # Check if user has any gyms at all
+            database.cur.execute("SELECT COUNT(*) FROM user_gyms WHERE user_id = %s", (user_id,))
+            gym_count = database.cur.fetchone()[0]
+            if gym_count == 0:
+                # User has no gyms, need to go through onboarding
+                pass  # current_gym_id remains None, which is fine for onboarding
+        
         # Create access token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
@@ -242,10 +219,6 @@ def login_user(user: UserLogin):
             user_id=user_id,
             username=username
         )
-
-        # Commit the transaction if we created a new gym
-        if current_gym_id and gym_result is None:  # We created a new gym
-            database.conn.commit()
 
     except HTTPException:
         database.conn.rollback()  # Rollback in case of HTTPException

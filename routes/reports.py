@@ -46,7 +46,7 @@ def get_revenue_report(period: str = "monthly", current_gym_id: int = Depends(ge
             
             revenue_data.append({
                 "period": period_str,
-                "total_revenue": float(row[1]) if row[1] is not None else 0.0
+                "total_revenue": float(row[1]) if row[1] is not None and str(row[1]).replace('.', '').replace('-', '').isdigit() else 0.0
             })
         
         return {"revenue_data": revenue_data}
@@ -74,12 +74,15 @@ def get_revenue_by_plan(current_gym_id: int = Depends(get_current_gym_id)):
             ORDER BY total_revenue DESC
         """, (current_gym_id, current_gym_id))
         
-        rows = database.cur.fetchall()
+        try:
+            rows = database.cur.fetchall()
+        except:
+            rows = []
         plan_revenue = []
         for row in rows:
             plan_revenue.append({
                 "plan_name": row[0] if row[0] is not None else 'Unknown',
-                "total_revenue": float(row[1]) if row[1] is not None else 0.0
+                "total_revenue": float(row[1]) if row[1] is not None and str(row[1]).replace('.', '').replace('-', '').isdigit() else 0.0
             })
         
         return {"plan_revenue": plan_revenue}
@@ -119,7 +122,10 @@ def get_client_growth(period: str = "monthly", current_gym_id: int = Depends(get
             ORDER BY period
         """, (current_gym_id,))
         
-        rows = database.cur.fetchall()
+        try:
+            rows = database.cur.fetchall()
+        except:
+            rows = []
         growth_data = []
         for row in rows:
             try:
@@ -156,7 +162,10 @@ def get_plan_distribution(current_gym_id: int = Depends(get_current_gym_id)):
             ORDER BY client_count DESC
         """, (current_gym_id, current_gym_id))
         
-        rows = database.cur.fetchall()
+        try:
+            rows = database.cur.fetchall()
+        except:
+            rows = []
         plan_distribution = []
         for row in rows:
             plan_distribution.append({
@@ -190,13 +199,16 @@ def get_payment_methods(current_gym_id: int = Depends(get_current_gym_id)):
             ORDER BY total_amount DESC
         """, (current_gym_id,))
         
-        rows = database.cur.fetchall()
+        try:
+            rows = database.cur.fetchall()
+        except:
+            rows = []
         payment_methods = []
         for row in rows:
             payment_methods.append({
                 "method": row[0] if row[0] is not None else 'Unknown',
                 "count": row[1] if row[1] is not None else 0,
-                "total_amount": float(row[2]) if row[2] is not None else 0.0
+                "total_amount": float(row[2]) if row[2] is not None and str(row[2]).replace('.', '').replace('-', '').isdigit() else 0.0
             })
         
         return {"payment_methods": payment_methods}
@@ -226,7 +238,10 @@ def get_membership_status(current_gym_id: int = Depends(get_current_gym_id)):
             ORDER BY count DESC
         """, (current_gym_id,))
         
-        rows = database.cur.fetchall()
+        try:
+            rows = database.cur.fetchall()
+        except:
+            rows = []
         membership_status = []
         for row in rows:
             membership_status.append({
@@ -288,7 +303,10 @@ def get_age_distribution(current_gym_id: int = Depends(get_current_gym_id)):
                 END
         """, (current_gym_id,))
         
-        rows = database.cur.fetchall()
+        try:
+            rows = database.cur.fetchall()
+        except:
+            rows = []
         age_distribution = []
         for row in rows:
             age_distribution.append({
@@ -319,7 +337,10 @@ def get_gender_distribution(current_gym_id: int = Depends(get_current_gym_id)):
             ORDER BY count DESC
         """, (current_gym_id,))
         
-        rows = database.cur.fetchall()
+        try:
+            rows = database.cur.fetchall()
+        except:
+            rows = []
         gender_distribution = []
         for row in rows:
             gender_distribution.append({
